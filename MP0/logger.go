@@ -21,14 +21,14 @@ import (
 func main() {
 	arguments := os.Args
 	if len(arguments) != 2 {
-		fmt.Println("Please provide a port number!")
+		fmt.Println(os.Stderr, "Please provide a port number!")
 		return
 	}
 
 	port := ":" + arguments[1]
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(os.Stderr, err)
 		return
 	}
 	defer listener.Close() // Close after function returns
