@@ -51,7 +51,8 @@ func handleConnection(conn net.Conn) {
 
 		fmt.Print(string(buf[:len]))
 		// TODO: Expected print format: [time] [node name] [message]
-		// 				Format right now: [time] [message]
+		// 				Format right now: [time in node message] [message]
+		//				Should it time received from node in message, or should it be time we're printing the message?
 
 		// TODO: conn.Close() if you read the close signal from somewhere node/ logger?
 	}
