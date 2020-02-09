@@ -23,11 +23,11 @@ func main() {
 		fmt.Println(os.Stderr, "Expected Format: node [name of the node] [address of centralized logging server] [port of centralized logging server]")
 		return
 	}
-	//nodeName := arguments[1]
-	//address := arguments[2]
+	// nodeName := arguments[1]
+	address := arguments[2]
 	port := arguments[3]
 
-	listener, _ := net.Listen("tcp", ":"+port)
+	listener, _ := net.Listen("tcp", address+":"+port)
 	defer listener.Close() // Close after function returns
 	conn, _ := listener.Accept()
 

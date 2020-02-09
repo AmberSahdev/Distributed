@@ -25,8 +25,8 @@ func main() {
 		return
 	}
 
-	port := ":" + arguments[1]
-	listener, err := net.Listen("tcp", port)
+	port := arguments[1]
+	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println(os.Stderr, err)
 		return
@@ -51,9 +51,11 @@ func handleConnection(conn net.Conn) {
 
 		fmt.Print(string(buf[:len]))
 		// TODO: Expected print format: [time] [node name] [message]
+		// 				Format right now: [time] [message]
 
-		// conn.Close() if you read the close signal from somewhere node/ logger?
+		// TODO: conn.Close() if you read the close signal from somewhere node/ logger?
 	}
+	// TODO: Print when a node disconnects: Ex: "1579666872.514535 - node2 disconnected"
 }
 
 /*
@@ -62,4 +64,5 @@ References:
 2. https://opensource.com/article/18/5/building-concurrent-tcp-server-go
 3. https://coderwall.com/p/wohavg/creating-a-simple-tcp-server-in-go
 5. https://www.linode.com/docs/development/go/developing-udp-and-tcp-clients-and-servers-in-go/
+6. https://golang.org/pkg/net/
 */
