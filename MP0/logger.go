@@ -65,5 +65,4 @@ References:
 2. https://opensource.com/article/18/5/building-concurrent-tcp-server-go
 3. https://coderwall.com/p/wohavg/creating-a-simple-tcp-server-in-go
 5. https://www.linode.com/docs/development/go/developing-udp-and-tcp-clients-and-servers-in-go/
-6. https://golang.org/pkg/net/
 */

@@ -37,4 +37,6 @@ func main() {
 		conn.Write([]byte(scanner.Text()))
 		// TODO: add nodeName between the stdin text
 	}
+
+	// TODO: Add exit handling code, i.e. send connection closed message on ctrl+c or
 }
