@@ -23,19 +23,20 @@ func main() {
 		fmt.Println(os.Stderr, "Expected Format: node [name of the node] [address of centralized logging server] [port of centralized logging server]")
 		return
 	}
-	// nodeName := arguments[1]
+	nodeName := arguments[1]
 	address := arguments[2]
 	port := arguments[3]
 
-	listener, _ := net.Listen("tcp", address+":"+port)
-	defer listener.Close() // Close after function returns
-	conn, _ := listener.Accept()
+	conn, _ := net.Dial("tcp", address+":"+port)
+	defer conn.Close() // Close after function returns
+
+	// TODO: conn.Write(nodeName) for the logger
+	_ = nodeName
 
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		conn.Write([]byte(scanner.Text()))
-		// TODO: add nodeName between the stdin text
 	}
 
 	// TODO: Add exit handling code, i.e. send connection closed message on ctrl+c or
