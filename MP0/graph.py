@@ -10,7 +10,7 @@ def plot_delay():
     seconds = 0
     with open('delay.txt') as file:
         for line in file:
-            line = line[:-1] # stripping the \n
+            line = line[:-2] # stripping the "\n"
             seconds += 1
             numbers = line.split(" ")
             for i in range(len(numbers)):
@@ -45,13 +45,16 @@ def plot_bandwidth():
     avgBandwidth = []
     with open('bandwidth.txt') as file:
         for line in file:
+            line = line[:-1] # stripping the "\n"
             seconds += 1
-            numbers = line.split(" ")
+            numbers = line.split(" ")[:-1]
             for i in range(len(numbers)):
-                numbers[i] = float(numbers[i])
-            bandwidth = np.array(numbers)
+                if numbers[i] != "":
+                    numbers[i] = float(numbers[i])
+            if numbers != []:
+                bandwidth = np.array(numbers)
 
-            # calculate minimum, maximum, median, 90th percentile
+            # calculate average bandwidth
             avgBandwidth.append(np.average(bandwidth))
 
     plt.plot(np.arange(seconds).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')

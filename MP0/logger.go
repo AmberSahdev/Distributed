@@ -30,17 +30,12 @@ func main() {
 
 	port := arguments[1]
 	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		fmt.Println(os.Stderr, err)
-		return
-	}
+	check(err)
 	defer listener.Close() // Close after function returns
 
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
-			panic(err)
-		}
+		check(err)
 		go handleConnection(conn) // open up a goroutine
 	}
 }
@@ -53,13 +48,14 @@ func handleConnection(conn net.Conn) {
 	// TODO: Expected print statement here of the form form "[time] - [node name] connected"
 	//       Example: 1579666871.892629 - node1 connected
 
-	//oneSecondMarker1 := time.Now()
-	for {
+	fDelay, fBandwidth := create_files()
+	defer fDelay.Close()
+	defer fBandwidth.Close()
 
+	oneSecMark1 := time.Now()
+	for {
 		len, err := conn.Read(buf)
-		if err != nil {
-			panic(err)
-		}
+		check(err)
 
 		now := time.Now()
 		var nanoseconds float64 = float64(now.UnixNano()) / 1e9
@@ -72,21 +68,34 @@ func handleConnection(conn net.Conn) {
 		// TODO: print node name here Expected print format: [time] [node name] [message]
 		fmt.Println(message)
 
-		// TODO: Write nanoseconds - transmittedTime to file for every second
-		_ = nanoseconds - transmittedTime
-		// TODO: Write bandwidth = len for every second
-		/*
-			oneSecondMarker2 := time.Now()
-			if oneSecondMarker2.Sub(oneSecondMarker1).Seconds() >= 1 {
-				oneSecondMarker1 = time.Now()
-				// write new line to both files
-
-			}
-		*/
+		// Writing to files delay.txt and bandwidth.txt
+		fDelay.WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
+		fBandwidth.WriteString(fmt.Sprintf("%d ", len))
+		oneSecMark2 := time.Now()
+		if oneSecMark2.Sub(oneSecMark1).Seconds() >= 1 {
+			oneSecMark1 = time.Now()
+			fDelay.WriteString("\n")
+			fBandwidth.WriteString("\n")
+		}
 
 		// TODO: conn.Close() if you read the close signal from somewhere node/ logger?
 	}
 	// TODO: Print when a node disconnects: Ex: "1579666872.514535 - node2 disconnected"
+}
+
+func check(err error) {
+	if err != nil {
+		fmt.Println(os.Stderr, err)
+		panic(err)
+	}
+}
+
+func create_files() (*os.File, *os.File) {
+	fDelay, err := os.Create("delay.txt")
+	check(err)
+	fBandwidth, err := os.Create("bandwidth.txt")
+	check(err)
+	return fDelay, fBandwidth
 }
 
 /*
