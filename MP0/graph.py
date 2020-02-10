@@ -16,7 +16,7 @@ def plot_delay():
             seconds += 1
             numbers = line.split(" ")
             for i in range(len(numbers)):
-                numbers[i] = float(numbers[i])
+                numbers[i] = np.float64(numbers[i])
             delays = np.array(numbers)
 
             # calculate minimum, maximum, median, 90th percentile
@@ -31,7 +31,7 @@ def plot_delay():
     ax1.plot(np.arange(seconds).tolist(), minList, marker='.', c='C1', label='minimum', linestyle='-')
     ax1.plot(np.arange(seconds).tolist(), maximumList, marker='<', c='C2', label='maximum')
     ax1.plot(np.arange(seconds).tolist(), medianList, marker='*', c='C3', label='median')
-    ax1.plot(np.arange(seconds).tolist(), ninetiethPercentileList, marker='p', c='C4', label='90th percentile')
+    ax1.plot(np.arange(seconds).tolist(), ninetiethPercentileList, marker='_', c='C4', label='90th percentile')
     plt.legend(loc='upper left');
     ax1.set_ylabel('delay in seconds')
     ax1.set_xlabel('time in seconds')
@@ -54,12 +54,12 @@ def plot_bandwidth():
             numbers = line.split(" ")[:-1]
             for i in range(len(numbers)):
                 if numbers[i] != "":
-                    numbers[i] = float(numbers[i])
+                    numbers[i] = np.float64(numbers[i])
             if numbers != []:
                 bandwidth = np.array(numbers)
 
             # calculate average bandwidth
-            avgBandwidth.append(np.average(bandwidth))
+            avgBandwidth.append(np.sum(bandwidth))
 
     plt.plot(np.arange(seconds).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
     plt.ylabel('length of strings')

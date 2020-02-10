@@ -35,8 +35,8 @@ func main() {
 	defer listener.Close() // Close after function returns
 
 	fDelay, fBandwidth := create_files()
-	defer fDelay.Close()
-	defer fBandwidth.Close()
+	//defer fDelay.Close()
+	//defer fBandwidth.Close()
 	filePointers := [2]*os.File{fDelay, fBandwidth}
 
 	go update_files(filePointers)
