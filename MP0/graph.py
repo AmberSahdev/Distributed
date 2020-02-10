@@ -10,6 +10,8 @@ def plot_delay():
     seconds = 0
     with open('delay.txt') as file:
         for line in file:
+            if line == "\n":
+                line = "0 \n"# continue
             line = line[:-2] # stripping the "\n"
             seconds += 1
             numbers = line.split(" ")
@@ -45,6 +47,8 @@ def plot_bandwidth():
     avgBandwidth = []
     with open('bandwidth.txt') as file:
         for line in file:
+            if line == "\n":
+                line = "0 \n"# continue
             line = line[:-1] # stripping the "\n"
             seconds += 1
             numbers = line.split(" ")[:-1]

@@ -34,26 +34,24 @@ func main() {
 	check(err)
 	defer listener.Close() // Close after function returns
 
-	for {
-		conn, err := listener.Accept()
-		check(err)
-		go handleConnection(conn) // open up a goroutine
-	}
-}
-
-func handleConnection(conn net.Conn) {
-	buf := make([]byte, 1024) // Make a buffer to hold incoming data
-
-	// nodeName:= make([]byte, 1024)
-	// len, err := conn.Read(nodeName)
-	// TODO: Expected print statement here of the form form "[time] - [node name] connected"
-	//       Example: 1579666871.892629 - node1 connected
-
 	fDelay, fBandwidth := create_files()
 	defer fDelay.Close()
 	defer fBandwidth.Close()
+	filePointers := [2]*os.File{fDelay, fBandwidth}
+
+	go update_files(filePointers)
+
+	for {
+		conn, err := listener.Accept()
+		check(err)
+		go handleConnection(conn, filePointers) // open up a goroutine
+	}
+}
+
+func handleConnection(conn net.Conn, filePointers [2]*os.File) {
+	buf := make([]byte, 1024) // Make a buffer to hold incoming data
+
 	nodeName := ""
-	oneSecMark1 := time.Now()
 	for {
 		inputLen, err := conn.Read(buf)
 		now := time.Now()
@@ -82,15 +80,10 @@ func handleConnection(conn net.Conn) {
 		} else {
 			fmt.Println(nodeName + " " + message)
 		}
+
 		// Writing to files delay.txt and bandwidth.txt
-		fDelay.WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
-		fBandwidth.WriteString(fmt.Sprintf("%d ", inputLen))
-		oneSecMark2 := time.Now()
-		if oneSecMark2.Sub(oneSecMark1).Seconds() >= 1 {
-			oneSecMark1 = time.Now()
-			fDelay.WriteString("\n")
-			fBandwidth.WriteString("\n")
-		}
+		filePointers[0].WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
+		filePointers[1].WriteString(fmt.Sprintf("%d ", inputLen))
 	}
 }
 
@@ -107,6 +100,19 @@ func create_files() (*os.File, *os.File) {
 	fBandwidth, err := os.Create("bandwidth.txt")
 	check(err)
 	return fDelay, fBandwidth
+}
+
+func update_files(filePointers [2]*os.File) {
+	// Adds a new line to our two files after every second
+	oneSecMark1 := time.Now()
+	for {
+		oneSecMark2 := time.Now()
+		if oneSecMark2.Sub(oneSecMark1).Seconds() >= 1 {
+			oneSecMark1 = time.Now()
+			filePointers[0].WriteString("\n")
+			filePointers[1].WriteString("\n")
+		}
+	}
 }
 
 /*
