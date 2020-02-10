@@ -33,8 +33,8 @@ def plot_delay():
     ax1.plot(np.arange(seconds).tolist(), medianList, marker='*', c='C3', label='median')
     ax1.plot(np.arange(seconds).tolist(), ninetiethPercentileList, marker='_', c='C4', label='90th percentile')
     plt.legend(loc='upper left');
-    ax1.set_ylabel('delay in seconds')
-    ax1.set_xlabel('time in seconds')
+    ax1.set_ylabel('Delay in Seconds')
+    ax1.set_xlabel('Time in Seconds')
     ax1.set_title('Delay Graph')
     # plt.show()
     plt.savefig('delay.png')
@@ -58,12 +58,12 @@ def plot_bandwidth():
             if numbers != []:
                 bandwidth = np.array(numbers)
 
-            # calculate average bandwidth
+            # calculate average bandwidth = length of strings / 1 second
             avgBandwidth.append(np.sum(bandwidth))
 
     plt.plot(np.arange(seconds).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
-    plt.ylabel('length of strings')
-    plt.xlabel('time in seconds')
+    plt.ylabel('Length of Strings/Number of Bytes')
+    plt.xlabel('Time in Seconds')
     plt.title('Bandwidth Graph')
     plt.savefig('bandwidth.png')
     plt.close()
