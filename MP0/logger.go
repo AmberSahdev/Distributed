@@ -91,10 +91,7 @@ func handleConnection(conn net.Conn) {
 			fDelay.WriteString("\n")
 			fBandwidth.WriteString("\n")
 		}
-
-		// TODO: conn.Close() if you read the close signal from somewhere node/ logger?
 	}
-	// TODO: Print when a node disconnects: Ex: "1579666872.514535 - node2 disconnected"
 }
 
 func check(err error) {

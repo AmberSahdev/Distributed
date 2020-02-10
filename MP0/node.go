@@ -23,7 +23,7 @@ func main() {
 		fmt.Println(os.Stderr, "Expected Format: node [name of the node] [address of centralized logging server] [port of centralized logging server]")
 		return
 	}
-	nodeName := arguments[1]
+	nodeName := arguments[1] + "\n"
 	address := arguments[2]
 	port := arguments[3]
 
