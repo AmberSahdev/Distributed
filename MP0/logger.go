@@ -81,12 +81,15 @@ func handleConnection(conn net.Conn, filePointers [2]*os.File) {
 			contentLen := len(contents)
 			transmittedTime := 0.0
 			fmt.Printf("%f ", nanoseconds)
-			if contentLen != 1 {
+			if contentLen == 2 {
 				transmittedTime, err = strconv.ParseFloat(contents[0], 64)
 				check(err)
 				fmt.Println(nodeName + " " + contents[1])
-			} else {
+			} else if contentLen == 1 {
 				fmt.Println("- " + nodeName + " connected")
+			} else {
+				fmt.Println("\n%d", contentLen)
+				panic("Why not be length 1 or 2")
 			}
 
 			// Writing to files delay.txt and bandwidth.txt

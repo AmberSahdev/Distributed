@@ -41,7 +41,7 @@ func main() {
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		_, err := conn.Write([]byte(scanner.Text()))
+		_, err := conn.Write([]byte(scanner.Text()+"\n"))
 		if err != nil {
 			panic(err)
 		}
