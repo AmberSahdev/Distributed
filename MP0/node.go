@@ -34,7 +34,6 @@ func main() {
 	}
 	defer conn.Close() // Close after function returns
 
-	// TODO: conn.Write(nodeName) for the logger
 	_, err = conn.Write([]byte(nodeName))
 	if err != nil {
 		panic(err)
@@ -47,5 +46,4 @@ func main() {
 			panic(err)
 		}
 	}
-	// TODO: Add exit handling code, i.e. send connection closed message on ctrl+c or
 }
