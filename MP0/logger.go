@@ -55,35 +55,44 @@ func handleConnection(conn net.Conn, filePointers [2]*os.File) {
 	for {
 		inputLen, err := conn.Read(buf)
 		now := time.Now()
-		var nanoseconds = float64(now.UnixNano()) / 1e9
+		nanoseconds := float64(now.UnixNano()) / 1e9
 		if err == io.EOF {
+			if nodeName == "" {
+				nodeName = "Unknown"
+			}
 			fmt.Printf("%f - ", nanoseconds)
 			fmt.Println(nodeName + " disconnected")
 			return
 		}
-		if nodeName == "" {
-			nodeName = string(buf[:inputLen])
-		}
-		contents := strings.Split(string(buf[:inputLen]), " ")
-		contentLen := len(contents)
-		transmittedTime := 0.0
-		message := ""
-		if contentLen != 1 {
-			transmittedTime, err = strconv.ParseFloat(contents[0], 64)
-			check(err)
-			message = contents[1]
-		}
+		eventList := strings.Split(string(buf[:inputLen]), "\n")
+		for i := 0; i < len(eventList); i++ {
+			if len(eventList[i]) == 0 {
+				if i != len(eventList)-1 {
+					panic("Why is this an empty event?")
+				}
+				continue
+			}
+			now = time.Now()
+			nanoseconds = float64(now.UnixNano()) / 1e9
+			if nodeName == "" {
+				nodeName = eventList[i]
+			}
+			contents := strings.Split(eventList[i], " ")
+			contentLen := len(contents)
+			transmittedTime := 0.0
+			fmt.Printf("%f ", nanoseconds)
+			if contentLen != 1 {
+				transmittedTime, err = strconv.ParseFloat(contents[0], 64)
+				check(err)
+				fmt.Println(nodeName + " " + contents[1])
+			} else {
+				fmt.Println("- " + nodeName + " connected")
+			}
 
-		fmt.Printf("%f ", nanoseconds)
-		if len(message) == 0 {
-			fmt.Println("- " + nodeName + " connected")
-		} else {
-			fmt.Println(nodeName + " " + message)
+			// Writing to files delay.txt and bandwidth.txt
+			filePointers[0].WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
+			filePointers[1].WriteString(fmt.Sprintf("%d ", inputLen))
 		}
-
-		// Writing to files delay.txt and bandwidth.txt
-		filePointers[0].WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
-		filePointers[1].WriteString(fmt.Sprintf("%d ", inputLen))
 	}
 }
 
