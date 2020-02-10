@@ -14,6 +14,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -51,26 +52,39 @@ func handleConnection(conn net.Conn) {
 	fDelay, fBandwidth := create_files()
 	defer fDelay.Close()
 	defer fBandwidth.Close()
-
+	nodeName := ""
 	oneSecMark1 := time.Now()
 	for {
-		len, err := conn.Read(buf)
-		check(err)
-
+		inputLen, err := conn.Read(buf)
 		now := time.Now()
-		var nanoseconds float64 = float64(now.UnixNano()) / 1e9
-
-		contents := strings.Split(string(buf[:len]), " ")
-		transmittedTime, err := strconv.ParseFloat(contents[0], 64)
-		message := contents[1]
+		var nanoseconds = float64(now.UnixNano()) / 1e9
+		if err == io.EOF {
+			fmt.Printf("%f - ", nanoseconds)
+			fmt.Println(nodeName + " disconnected")
+			return
+		}
+		if nodeName == "" {
+			nodeName = string(buf[:inputLen])
+		}
+		contents := strings.Split(string(buf[:inputLen]), " ")
+		contentLen := len(contents)
+		transmittedTime := 0.0
+		message := ""
+		if contentLen != 1 {
+			transmittedTime, err = strconv.ParseFloat(contents[0], 64)
+			check(err)
+			message = contents[1]
+		}
 
 		fmt.Printf("%f ", nanoseconds)
-		// TODO: print node name here Expected print format: [time] [node name] [message]
-		fmt.Println(message)
-
+		if len(message) == 0 {
+			fmt.Println("- " + nodeName + " connected")
+		} else {
+			fmt.Println(nodeName + " " + message)
+		}
 		// Writing to files delay.txt and bandwidth.txt
 		fDelay.WriteString(fmt.Sprintf("%f ", nanoseconds-transmittedTime))
-		fBandwidth.WriteString(fmt.Sprintf("%d ", len))
+		fBandwidth.WriteString(fmt.Sprintf("%d ", inputLen))
 		oneSecMark2 := time.Now()
 		if oneSecMark2.Sub(oneSecMark1).Seconds() >= 1 {
 			oneSecMark1 = time.Now()

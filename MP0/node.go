@@ -27,17 +27,25 @@ func main() {
 	address := arguments[2]
 	port := arguments[3]
 
-	conn, _ := net.Dial("tcp", address+":"+port)
+	conn, err := net.Dial("tcp", address+":"+port)
+	if err != nil {
+		fmt.Println(os.Stderr, err)
+		panic(err)
+	}
 	defer conn.Close() // Close after function returns
 
 	// TODO: conn.Write(nodeName) for the logger
-	_ = nodeName
-
+	_, err = conn.Write([]byte(nodeName))
+	if err != nil {
+		panic(err)
+	}
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		conn.Write([]byte(scanner.Text()))
+		_, err := conn.Write([]byte(scanner.Text()))
+		if err != nil {
+			panic(err)
+		}
 	}
-
 	// TODO: Add exit handling code, i.e. send connection closed message on ctrl+c or
 }
