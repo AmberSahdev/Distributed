@@ -1,7 +1,13 @@
 all: build_logger build_node
 
 build_logger:
-    go build logger.go
+	@echo "building logger"
+	go build logger.go
 
 build_node:
-    go build node.go
+	@echo "building node"
+	go build node.go
+
+clean:
+	@echo "deleting binaries"
+	rm node && rm logger
