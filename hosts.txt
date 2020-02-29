@@ -1,0 +1,10 @@
+sp20-cs425-g22-01.cs.illinois.edu
+sp20-cs425-g22-02.cs.illinois.edu
+sp20-cs425-g22-03.cs.illinois.edu
+sp20-cs425-g22-04.cs.illinois.edu
+sp20-cs425-g22-05.cs.illinois.edu
+sp20-cs425-g22-06.cs.illinois.edu
+sp20-cs425-g22-07.cs.illinois.edu
+sp20-cs425-g22-08.cs.illinois.edu
+sp20-cs425-g22-09.cs.illinois.edu
+sp20-cs425-g22-10.cs.illinois.edu
