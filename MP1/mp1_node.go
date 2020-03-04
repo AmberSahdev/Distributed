@@ -47,11 +47,15 @@ func check(e error) {
 	}
 }
 
+func (destNode nodeComms) unicast(m message) {
+	destNode.outbox <- m
+}
+
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
 	for i := 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && !nodeList[i].isSelf {
-			nodeList[i].outbox <- m
+			nodeList[i].unicast(m)
 		}
 	}
 	// deliver to local
