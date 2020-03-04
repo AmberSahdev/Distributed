@@ -19,12 +19,12 @@ var nodeList []nodeComms
 var localReceivingChannel chan message
 
 type nodeComms struct {
-	sequenceNumber int      //
-	port           string   // outgoing node's port
-	address        string   // outgoing node's address
-	conn           net.Conn // TODO find out if pass by value or pointer is better here
-	outbox         chan message
-	isConnected    bool
+	senderMessageNum int      //
+	port             string   // outgoing node's port
+	address          string   // outgoing node's address
+	conn             net.Conn // TODO find out if pass by value or pointer is better here
+	outbox           chan message
+	isConnected      bool
 }
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
@@ -49,8 +49,8 @@ func check(e error) {
 
 func (destNode nodeComms) unicast(m message) {
 	if m.originalSender == localNodeNum {
-		nodeList[localNodeNum].sequenceNumber++
-		m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
+		nodeList[localNodeNum].senderMessageNum++
+		m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 	}
 	destNode.outbox <- m
 }
@@ -58,8 +58,8 @@ func (destNode nodeComms) unicast(m message) {
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
 	if m.originalSender == localNodeNum {
-		nodeList[localNodeNum].sequenceNumber++
-		m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
+		nodeList[localNodeNum].senderMessageNum++
+		m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 	}
 	for i := 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
@@ -137,7 +137,6 @@ func openListener(port string) net.Listener {
 	return listener
 }
 
-// TODO handles stdin transaction messaging
 func handleLocalEventGenerator() {
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
@@ -183,7 +182,7 @@ func setupConnections(port string, hostList []string) {
 }
 
 func isAlreadyReceived(m message) bool {
-	return m.isRMulticast && nodeList[m.originalSender].sequenceNumber >= m.sequenceNumber
+	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.sequenceNumber
 }
 
 // TODO Biggest Fuck, drains the message Channel
@@ -198,8 +197,7 @@ func handleMessageChannel() {
 			m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
 			bMulticast(m)
 		}
-
-		nodeList[m.originalSender].sequenceNumber = m.sequenceNumber
+		nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
 		if m.isRMulticast {
 			rMulticast(m)
 		}
