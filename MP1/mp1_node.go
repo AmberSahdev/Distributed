@@ -19,7 +19,7 @@ var nodeList []nodeComms
 var localReceivingChannels chan message
 
 type nodeComms struct {
-	number      int      //
+	sequenceNumber      int      //
 	port        string   // outgoing node's port
 	address     string   // outgoing node's address
 	conn        net.Conn // TODO find out if pass by value or pointer is better here
@@ -133,12 +133,23 @@ func openListener(port string) net.Listener {
 
 // TODO handles stdin transaction messaging
 func handleLocalEventGenerator() {
-	var m message
+	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		scanner.Text()
+		text = scanner.Text()
+		m := message{
+			originalSender = localNodeNum,
+			senderMessageNumber = ,
+			transaction = text,
+			sequenceNumber = ,
+			isFinal = false,
+			isRMulticast = true
+		}
+
+		rMulticast(m)
+		// add to local channel TODO
 	}
-	rMulticast(m)
+
 }
 
 // TODO figure out how to block until everyone is connected
@@ -150,6 +161,7 @@ func setupConnections(port string, hostList []string) {
 	var err error
 	listener := openListener(port)
 	go handleAllIncomingConns(listener)
+
 	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
@@ -166,6 +178,7 @@ func setupConnections(port string, hostList []string) {
 	waitForAllNodesSync()
 }
 
+// TODO:
 func isAlreadyReceived(m message) bool {
 	return false
 }
