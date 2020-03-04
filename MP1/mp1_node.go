@@ -14,11 +14,6 @@ import (
 
 var numNodes int
 
-type vectorTimestamp struct {
-	time []int
-	lock mux
-}
-
 
 
 var localTime vectorTime // tracks local vector timestamp
@@ -40,6 +35,14 @@ var nodeList []nodeComms
 // Todo define an actual encode & decode method for this and settle on a/many concrete
 // types for the decoded result
 type message interface{}
+
+type bank_message struct{
+	originalSender int
+	senderMessageNumber int
+	event string
+	sequenceNumber int
+	isFinal bool
+}
 
 // Performs our current error handling
 func check(e error) {
