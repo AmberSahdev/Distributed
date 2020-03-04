@@ -12,20 +12,19 @@ import (
 	"time"
 )
 
-var numNodes int // specified parameter, number of starting nodes
-var numConns int // tracks number of other nodes connected to this node
-var nodeNum int  // tracks local node's number
+var numNodes int     // specified parameter, number of starting nodes
+var numConns int     // tracks number of other nodes connected to this node
+var localNodeNum int // tracks local node's number
 var nodeList []nodeComms
-var localReceivingMessages chan message
+var localReceivingChannels chan message
 
 type nodeComms struct {
-	number      int
-	port        string
-	address     string
+	number      int      //
+	port        string   // outgoing node's port
+	address     string   // outgoing node's address
 	conn        net.Conn // TODO find out if pass by value or pointer is better here
 	outbox      chan message
 	isConnected bool
-	isSelf      bool
 }
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
@@ -55,12 +54,12 @@ func (destNode nodeComms) unicast(m message) {
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
 	for i := 0; i < numNodes; i++ {
-		if nodeList[i].isConnected && !nodeList[i].isSelf {
+		if nodeList[i].isConnected && i != localNodeNum {
 			nodeList[i].unicast(m)
 		}
 	}
 	// deliver to local
-	nodeList[nodeNum].outbox <- m
+	nodeList[localNodeNum].outbox <- m
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
@@ -113,7 +112,7 @@ func receiveIncomingData(conn net.Conn) {
 			fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
 			return
 		}
-		localReceivingMessages <- m
+		localReceivingChannels <- m
 	}
 }
 
@@ -132,7 +131,7 @@ func openListener(port string) net.Listener {
 	return listener
 }
 
-// handles stdin transaction messaging
+// TODO handles stdin transaction messaging
 func handleLocalEventGenerator() {
 	var m message
 	scanner := bufio.NewScanner(os.Stdin)
@@ -142,6 +141,7 @@ func handleLocalEventGenerator() {
 	rMulticast(m)
 }
 
+// TODO figure out how to block until everyone is connected
 func waitForAllNodesSync() {
 	time.Sleep(10)
 }
@@ -153,12 +153,30 @@ func setupConnections(port string, hostList []string) {
 	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
-		nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
-		if err == nil {
-			nodeList[curNodeNum].openOutgoingConn()
+		if localNodeNum == curNodeNum {
+			nodeList[curNodeNum].conn = nil
+			nodeList[curNodeNum].outbox = localReceivingChannels
+		} else {
+			nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
+			if err == nil {
+				nodeList[curNodeNum].openOutgoingConn()
+			}
 		}
 	}
 	waitForAllNodesSync()
+}
+
+func isAlreadyReceived(m message) bool {
+
+}
+
+// TODO Biggest Fuck, drains the message Channel
+func handleMessageChannel() {
+	for m := range localReceivingChannels {
+		if isAlreadyReceived(m) {
+			continue
+		}
+	}
 }
 
 func main() {
@@ -170,7 +188,8 @@ func main() {
 	numNodes, _ = strconv.Atoi(arguments[1])
 	hostList := parseHostTextfile("../hosts.txt")
 	agreedPort := arguments[2]
-	nodeNum, _ = strconv.Atoi(arguments[3])
+	localNodeNum, _ = strconv.Atoi(arguments[3])
 	setupConnections(agreedPort, hostList)
-	handleLocalEventGenerator()
+	go handleLocalEventGenerator()
+	handleMessageChannel()
 }
