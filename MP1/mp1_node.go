@@ -22,9 +22,10 @@ type nodeComms struct {
 	number      int
 	port        string
 	address     string
+	conn        net.Conn // TODO find out if pass by value or pointer is better here
+	outbox      chan message
 	isConnected bool
 	isSelf      bool
-	outbox      chan message
 }
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
@@ -68,35 +69,28 @@ func rMulticast(m message) {
 	bMulticast(m)
 }
 
-func (destNode *nodeComms) sendData(m message) error {
-
-	return err
-}
-
-func (destNode *nodeComms) communicationTask(conn net.Conn) {
+func (destNode *nodeComms) communicationTask() {
 	var err error = nil
+	var m message
+	enc := gob.NewEncoder(destNode.conn)
+	defer destNode.setConnected(false)
 	for err != nil {
-	m:
-		<-destNode.outbox
-		err = destNode.sendData(conn, m)
+		m <- destNode.outbox
+		err = enc.Encode(m)
 	}
-	destNode.setConnected(false, conn)
-	return
 }
 
-func (destNode *nodeComms) setConnected(status bool, conn net.Conn) {
-	destNode.isConnected = status
-	// zero local vector timestamp index
-	if status == false {
-		numConns--
-		conn.Close()
-		close(destNode.outbox)
-	} else {
-		numConns++
-		destNode.outbox = make(chan message)
-		go nodeList[curNodeNum].communicationTask(conn)
-	}
-	return
+func (destNode *nodeComms) openOutgoingConn() {
+	destNode.isConnected = true
+	numConns++
+	destNode.outbox = make(chan message)
+	go destNode.communicationTask()
+}
+
+func (destNode *nodeComms) closeOutgoingConn() {
+	numConns--
+	destNode.conn.Close()
+	close(destNode.outbox)
 }
 
 func parseHostTextfile(path string) []string {
@@ -177,14 +171,15 @@ func handleLocalEventGenerator() {
 	rMulticast(m)
 }
 
-func setupConns(port string, hostList []string) {
+func setupConnections(port string, hostList []string) {
+	var err error
 	startHandlingIncomingConns(port)
 	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
-		conn, err := net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
+		nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
 		if err == nil {
-			nodeList[curNodeNum].setConnected(true, conn)
+			nodeList[curNodeNum].setConnected(true)
 		}
 	}
 	waitForAllNodesSync()
@@ -200,6 +195,6 @@ func main() {
 	hostList := parseHostTextfile("../hosts.txt")
 	agreedPort := arguments[2]
 	nodeNum, _ = strconv.Atoi(arguments[3])
-	setupConns(agreedPort, hostList)
+	setupConnections(agreedPort, hostList)
 	handleLocalEventGenerator()
 }
