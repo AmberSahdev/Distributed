@@ -16,15 +16,15 @@ var numNodes int     // specified parameter, number of starting nodes
 var numConns int     // tracks number of other nodes connected to this node
 var localNodeNum int // tracks local node's number
 var nodeList []nodeComms
-var localReceivingChannels chan message
+var localReceivingChannel chan message
 
 type nodeComms struct {
-	sequenceNumber      int      //
-	port        string   // outgoing node's port
-	address     string   // outgoing node's address
-	conn        net.Conn // TODO find out if pass by value or pointer is better here
-	outbox      chan message
-	isConnected bool
+	sequenceNumber int      //
+	port           string   // outgoing node's port
+	address        string   // outgoing node's address
+	conn           net.Conn // TODO find out if pass by value or pointer is better here
+	outbox         chan message
+	isConnected    bool
 }
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
@@ -33,7 +33,7 @@ type message bank_message
 
 type bank_message struct {
 	originalSender      int    // local node number of sender of original transaction
-	senderMessageNumber int    // local message number sent by sender
+	senderMessageNumber int    // index of the event at the process that generated the event
 	transaction         string // sender's transaction generator string
 	sequenceNumber      int    // -1 if uninitialized, used for proposal and final
 	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
@@ -118,7 +118,7 @@ func receiveIncomingData(conn net.Conn) {
 			fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
 			return
 		}
-		localReceivingChannels <- m
+		localReceivingChannel <- m
 	}
 }
 
@@ -142,18 +142,16 @@ func handleLocalEventGenerator() {
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		text = scanner.Text()
+		text := scanner.Text()
 		m := message{
-			originalSender = localNodeNum,
-			senderMessageNumber = ,
-			transaction = text,
-			sequenceNumber = ,
-			isFinal = false,
-			isRMulticast = true
-		}
+			originalSender:      localNodeNum,
+			senderMessageNumber: -1,
+			transaction:         text,
+			sequenceNumber:      -1,
+			isFinal:             false,
+			isRMulticast:        false}
 
-		rMulticast(m)
-		// add to local channel TODO
+		localReceivingChannel <- m
 	}
 
 }
@@ -173,7 +171,7 @@ func setupConnections(port string, hostList []string) {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 		if localNodeNum == curNodeNum {
 			nodeList[curNodeNum].conn = nil
-			nodeList[curNodeNum].outbox = localReceivingChannels
+			nodeList[curNodeNum].outbox = localReceivingChannel
 		} else {
 			nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
 			if err == nil {
@@ -190,7 +188,7 @@ func isAlreadyReceived(m message) bool {
 
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
-	for m := range localReceivingChannels {
+	for m := range localReceivingChannel {
 		if isAlreadyReceived(m) {
 			continue
 		}
