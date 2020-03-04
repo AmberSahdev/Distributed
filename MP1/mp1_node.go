@@ -182,7 +182,7 @@ func setupConnections(port string, hostList []string) {
 }
 
 func isAlreadyReceived(m message) bool {
-	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.sequenceNumber
+	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.senderMessageNumber
 }
 
 // TODO Biggest Fuck, drains the message Channel
