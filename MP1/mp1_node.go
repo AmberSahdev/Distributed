@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,36 +13,31 @@ import (
 	"time"
 )
 
-var numNodes int
-
-
-
-var localTime vectorTime // tracks local vector timestamp
+var numNodes int // specified parameter, number of starting nodes
 var numConns int // tracks number of other nodes connected to this node
-var nodeNum int // keeps track of this node's number
+var nodeNum int  // tracks local node's number
+var nodeList []nodeComms
 
 type nodeComms struct {
-	number int
-	port string
-	address string
+	number      int
+	port        string
+	address     string
 	isConnected bool
-	isLeader bool
-	isSelf bool
-	outbox chan message
+	isSelf      bool
+	outbox      chan message
 }
-
-var nodeList []nodeComms
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
 // types for the decoded result
-type message interface{}
+type message bank_message
 
-type bank_message struct{
-	originalSender int
-	senderMessageNumber int
-	event string
-	sequenceNumber int
-	isFinal bool
+type bank_message struct {
+	originalSender      int    // local node number of sender of original transaction
+	senderMessageNumber int    // local message number sent by sender
+	transaction         string // sender's transaction generator string
+	sequenceNumber      int    // -1 if uninitialized, used for proposal and final
+	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
+	isRMulticast        bool   // instructs receiver to multicast message
 }
 
 // Performs our current error handling
@@ -52,44 +48,45 @@ func check(e error) {
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
-func rMulticast(m message){
-	// Add vector clock increment here
-
-	for i := 0; i < numNodes; i++{
-		if nodeList[i].isConnected {
+func bMulticast(m message) {
+	for i := 0; i < numNodes; i++ {
+		if nodeList[i].isConnected && !nodeList[i].isSelf {
 			nodeList[i].outbox <- m
 		}
 	}
+	// deliver to local
+	nodeList[nodeNum].outbox <- m
 }
 
-func (destNode *nodeComms) sendData(m message) error{
-	// Todo
-	// serialize m and send it via conn (a TCP connection)
-	//  use conn.Write() and get error handling from conn
-	conn.Write(m)
+// Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
+func rMulticast(m message) {
+	m.isRMulticast = true
+	bMulticast(m)
+}
+
+func (destNode *nodeComms) sendData(m message) error {
+
 	return err
 }
 
-func (destNode *nodeComms) communicationTask(conn net.Conn){
+func (destNode *nodeComms) communicationTask(conn net.Conn) {
 	var err error = nil
 	for err != nil {
-		m :<- destNode.outbox
+	m:
+		<-destNode.outbox
 		err = destNode.sendData(conn, m)
 	}
 	destNode.setConnected(false, conn)
 	return
 }
 
-func (destNode *nodeComms) setConnected(status bool, conn net.Conn){
+func (destNode *nodeComms) setConnected(status bool, conn net.Conn) {
 	destNode.isConnected = status
 	// zero local vector timestamp index
 	if status == false {
 		numConns--
 		conn.Close()
 		close(destNode.outbox)
-		if destNode.isLeader {
-			updateLeader()
-		}
 	} else {
 		numConns++
 		destNode.outbox = make(chan message)
@@ -98,27 +95,13 @@ func (destNode *nodeComms) setConnected(status bool, conn net.Conn){
 	return
 }
 
-func parseHostTextfile(path string) []string{
+func parseHostTextfile(path string) []string {
 	dat, err := ioutil.ReadFile(path)
 	check(err)
 	return strings.Split(dat, "\n")
 }
 
-dat, err := ioutil.ReadFile(hostTextFile)
-check(err)
-
-func setupConns(port string, hostList []string) {
-	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
-		nodeList[curNodeNum].port = port
-		nodeList[curNodeNum].address = hostList[curNodeNum]
-		conn, err := net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
-		if err == nil{
-			nodeList[curNodeNum].setConnected(true, conn)
-		}
-	}
-}
-
-func handleIncomingConn(conn net.Conn){
+func handleIncomingConn(conn net.Conn) {
 	buf := make([]byte, 1048576) // Make 1MB buffer to hold incoming data
 	incomingNodeNum := -1
 	for {
@@ -133,7 +116,7 @@ func handleIncomingConn(conn net.Conn){
 		for i := 0; i < len(eventList); i++ {
 			if len(eventList[i]) == 0 {
 				if i != len(eventList)-1 {
-					panic("Why is this an empty event?")
+					panic("Why is this an empty transaction?")
 				}
 				continue
 			}
@@ -164,7 +147,7 @@ func handleIncomingConn(conn net.Conn){
 	}
 }
 
-func handleIncomingConns(port string){
+func handleIncomingConns(port string) {
 	listener, err := net.Listen("tcp", ":"+port)
 	check(err)
 	defer listener.Close()
@@ -175,19 +158,32 @@ func handleIncomingConns(port string){
 	}
 }
 
-func startHandlingIncomingConns(port string){
+func startHandlingIncomingConns(port string) {
 	go handleIncomingConns(port)
 	return
 }
 
-// handles stdin event messaging
-func handleLocalEventGenerator(){
+// handles stdin transaction messaging
+func handleLocalEventGenerator() {
 	var m message
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		scanner.Text()
 	}
 	rMulticast(m)
+}
+
+func setupConns(port string, hostList []string) {
+	startHandlingIncomingConns(port)
+	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
+		nodeList[curNodeNum].port = port
+		nodeList[curNodeNum].address = hostList[curNodeNum]
+		conn, err := net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
+		if err == nil {
+			nodeList[curNodeNum].setConnected(true, conn)
+		}
+	}
+	waitForAllNodesSync()
 }
 
 func main() {
@@ -200,9 +196,6 @@ func main() {
 	hostList := parseHostTextfile("../hosts.txt")
 	agreedPort := arguments[2]
 	nodeNum, _ = strconv.Atoi(arguments[3])
-	startHandlingIncomingConns(agreedPort)
 	setupConns(agreedPort, hostList)
-	waitForAllNodes()
-	go handleLocalEventGenerator()
-
+	handleLocalEventGenerator()
 }
