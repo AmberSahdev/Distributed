@@ -183,7 +183,7 @@ func setupConnections(port string, hostList []string) {
 }
 
 func isAlreadyReceived(m message) bool {
-	return nodeList[m.originalSender].sequenceNumber >= m.sequenceNumber
+	return m.isRMulitcast && nodeList[m.originalSender].sequenceNumber >= m.sequenceNumber
 }
 
 // TODO Biggest Fuck, drains the message Channel
@@ -191,6 +191,10 @@ func handleMessageChannel() {
 	for m := range localReceivingChannel {
 		if isAlreadyReceived(m) {
 			continue
+		}
+		if m.senderMessageNumber < 0 {
+			// We are handling a local event.
+			bMulticast(m)
 		}
 		nodeList[m.originalSender].sequenceNumber = m.sequenceNumber
 		if m.isRMulticast {
