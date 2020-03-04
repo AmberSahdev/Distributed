@@ -142,6 +142,10 @@ func handleLocalEventGenerator() {
 	rMulticast(m)
 }
 
+func waitForAllNodesSync() {
+	time.Sleep(10)
+}
+
 func setupConnections(port string, hostList []string) {
 	var err error
 	listener := openListener(port)
@@ -151,7 +155,7 @@ func setupConnections(port string, hostList []string) {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 		nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
 		if err == nil {
-			nodeList[curNodeNum].setConnected(true)
+			nodeList[curNodeNum].openOutgoingConn()
 		}
 	}
 	waitForAllNodesSync()
