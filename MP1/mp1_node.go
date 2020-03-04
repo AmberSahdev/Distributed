@@ -193,8 +193,8 @@ func handleMessageChannel() {
 		}
 		if m.senderMessageNumber < 0 {
 			// We are handling a local event.
-			nodeList[localNodeNum].sequenceNumber += 1
-			m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
+			nodeList[localNodeNum].senderMessageNum += 1
+			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			bMulticast(m)
 		}
 		nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
