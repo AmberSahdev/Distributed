@@ -48,13 +48,19 @@ func check(e error) {
 }
 
 func (destNode nodeComms) unicast(m message) {
-	// TODO increment sequence number
+	if m.originalSender == localNodeNum {
+		nodeList[localNodeNum].sequenceNumber++
+		m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
+	}
 	destNode.outbox <- m
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
-	// TODO increment sequence number
+	if m.originalSender == localNodeNum {
+		nodeList[localNodeNum].sequenceNumber++
+		m.senderMessageNumber = nodeList[localNodeNum].sequenceNumber
+	}
 	for i := 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
 			nodeList[i].outbox <- m
@@ -178,9 +184,8 @@ func setupConnections(port string, hostList []string) {
 	waitForAllNodesSync()
 }
 
-// TODO:
 func isAlreadyReceived(m message) bool {
-	return false
+	return nodeList[m.originalSender].sequenceNumber >= m.sequenceNumber
 }
 
 // TODO Biggest Fuck, drains the message Channel
@@ -189,6 +194,7 @@ func handleMessageChannel() {
 		if isAlreadyReceived(m) {
 			continue
 		}
+		nodeList[m.originalSender].sequenceNumber = m.sequenceNumber
 		if m.isRMulticast {
 			rMulticast(m)
 		}
