@@ -192,7 +192,7 @@ func handleMessageChannel() {
 		if isAlreadyReceived(m) {
 			continue
 		}
-		if m.senderMessageNumber == -1 {
+		if m.senderMessageNumber < 0 {
 			// We are handling a local event.
 			// TODO: change  m.senderMessageNumber
 			bMulticast(m)
