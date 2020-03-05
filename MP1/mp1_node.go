@@ -22,14 +22,14 @@ var nodeList []nodeComms
 var localReceivingChannel chan Message
 
 func (destNode *nodeComms) communicationTask() {
-	fmt.Println("preparing To Receive m's")
+	// fmt.Println("preparing To Receive m's")
 	tcpEnc := gob.NewEncoder(destNode.conn)
 	defer destNode.conn.Close()
-	fmt.Println("Ready To Receive m's")
+	// fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
-		fmt.Println("about to send m")
+		// fmt.Println("about to send m")
 		err := tcpEnc.Encode(m)
-		fmt.Println("sent m")
+		// fmt.Println("sent m")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to send Message, receiver down?")
 			return
@@ -40,7 +40,7 @@ func (destNode *nodeComms) communicationTask() {
 func (destNode *nodeComms) openOutgoingConn() {
 	destNode.isConnected = true
 	numConns++
-	destNode.outbox = make(chan Message)
+	destNode.outbox = make(chan Message, 1024)
 	m := Message{
 		OriginalSender:      localNodeNum,
 		SenderMessageNumber: 0,
@@ -49,9 +49,8 @@ func (destNode *nodeComms) openOutgoingConn() {
 		TransactionId:       math.MaxUint64,
 		IsFinal:             false,
 		IsRMulticast:        false}
-	fmt.Println("push message")
-	destNode.outbox <- m
 	go destNode.communicationTask()
+	destNode.outbox <- m
 }
 
 // ran when the incoming connection to this node throws and errror
@@ -70,10 +69,10 @@ func parseHostTextfile(path string) []string {
 func receiveIncomingData(conn net.Conn) {
 	var m Message
 	tcpDecode := gob.NewDecoder(conn)
-	fmt.Println("Ready To Receive Data")
+	// fmt.Println("Ready To Receive Data")
 	err := tcpDecode.Decode(&m)
 	incomingNodeNum := m.OriginalSender
-	fmt.Println("Fuck Me")
+	// fmt.Println("Fuck Me")
 	if !nodeList[incomingNodeNum].isConnected {
 		// set up a new connection
 		nodeList[incomingNodeNum].openOutgoingConn()
@@ -292,6 +291,7 @@ func main() {
 	check(err)
 	numNodes = uint8(newNumNodes)
 	localNodeNum = uint8(newNodeNum)
+	localReceivingChannel = make(chan Message, 65536)
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
 	handleMessageChannel()
