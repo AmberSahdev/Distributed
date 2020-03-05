@@ -247,7 +247,7 @@ func deliverAgreedTransactions(pq PriorityQueue) {
 func allResponsesReceived(responsesReceived []bool) bool {
 	var i uint8
 	for i = 0; i < numNodes; i++ {
-		if nodeList[i].isConnected && responsesReceived[i] == false {
+		if i != localNodeNum && nodeList[i].isConnected && responsesReceived[i] == false {
 			return false
 		}
 	}
