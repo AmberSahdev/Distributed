@@ -202,6 +202,9 @@ func handleMessageChannel() {
 			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
 			m.proposeSequenceNum()
+			// todo increment maxProposedSeqNum
+
+
 		} else if m.isFinal { // Receiving message 3 here
 			// reorder based on final priority
 			idx := pq.find(m.transactionId)
