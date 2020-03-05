@@ -201,8 +201,11 @@ func handleMessageChannel() {
 			heap.Fix(pq, idx)
 			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
-			m.proposeSequenceNum()
-			// todo increment maxProposedSeqNum
+			// reply with maxProposedSeqNum + 1
+			maxProposedSeqNum += 1
+			m.sequenceNumber = maxProposedSeqNum
+			unicast()
+			// store in priority queue
 
 
 		} else if m.isFinal { // Receiving message 3 here
