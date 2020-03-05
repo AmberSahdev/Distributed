@@ -19,7 +19,6 @@ var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan message
 
-
 func (destNode *nodeComms) communicationTask() {
 	tcpEnc := gob.NewEncoder(destNode.conn)
 	defer destNode.conn.Close()
@@ -213,7 +212,8 @@ func handleMessageChannel() {
 
 // check if message ready (all nodes that are active and have response Received = true in responsesReceived)
 func allResponsesReceived(responsesReceived []bool) bool {
-	for i := 0; i < numNodes; i++ {
+	var i uint8
+	for i = 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && responsesReceived[i] == false {
 			return false
 		}
