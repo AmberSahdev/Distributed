@@ -147,6 +147,7 @@ func setupConnections(port string, hostList []string) {
 		} else {
 			nodeList[curNodeNum].conn, err = net.Dial("tcp", (nodeList[curNodeNum].address)+":"+(nodeList[curNodeNum].port))
 			if err == nil {
+				fmt.Println("Dialed in!")
 				nodeList[curNodeNum].openOutgoingConn()
 			} else {
 				fmt.Println(err)
