@@ -191,26 +191,28 @@ func handleMessageChannel() {
 		}
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
-			// find index of item in pq -> i
 			idx := pq.find(m.transactionId) // TODO if we didn't find it then create that element up there somewhere
 
-			// update priority in pq
+			// update priority in pq = max(proposed priority, local priority)
 			if m.sequenceNumber > pq[idx].priority {
 				pq[idx].priority = m.sequenceNumber
 			}
-			heap.Fix(pq, idx)
-			pq[idx].responsesReceived[m.originalSender-1] = true
-
-			if allResponsesReceived(pq[0].responsesReceived) { // pq[0] is element with max priority
+			pq[idx].responsesReceived[m.originalSender] = true
+			if allResponsesReceived(pq[idx].responsesReceived) {
 				m.isFinal = true
-				for m.isFinal {
-					rMulticast(m)
-					heap.Pop(pq)
-					heap.Fix(pq, 0)
-					m = pq[0] // next highest priority
-				}
-
+				pq[idx].value.isFinal = true
+				// todo fix up M before multicasting it
+				rMulticast(m)
 			}
+			heap.Fix(pq, idx)
+
+			// commmit agreed transacations to account
+			m = &pq[0].value // highest priority // pq[0] is element with max priority
+			for m.isFinal {
+				heap.Pop(pq)    // TODO: put it into our account balances
+				m = &pq[0].value // next highest priority
+			}
+
 		} else if m.needsProposal() { // external message needing proposal
 			m.proposeSequenceNum()
 		}
