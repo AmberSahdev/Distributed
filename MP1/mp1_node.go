@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -25,7 +26,7 @@ func (destNode *nodeComms) communicationTask() {
 	for m := range destNode.outbox {
 		err := tcpEnc.Encode(m)
 		if err != nil {
-			fmt.Println(os.Stderr, "Failed to send message, receiver down?")
+			fmt.Fprintln(os.Stderr, "Failed to send message, receiver down?")
 			return
 		}
 	}
@@ -95,7 +96,7 @@ func handleLocalEventGenerator() {
 			senderMessageNumber: -1,
 			transaction:         text,
 			sequenceNumber:      -1,
-			transactionId:       -1,
+			transactionId:       math.MaxUint64,
 			isFinal:             false,
 			isRMulticast:        false}
 
@@ -107,6 +108,9 @@ func handleLocalEventGenerator() {
 // TODO figure out how to block until everyone is connected
 func waitForAllNodesSync() {
 	time.Sleep(10)
+	if numConns != numNodes {
+		fmt.Fprintf(os.Stderr, "numConns: %d, numNodes: %d", numConns, numNodes)
+	}
 }
 
 func setupConnections(port string, hostList []string) {
@@ -139,7 +143,7 @@ func (m message) isProposal() bool {
 	return m.sequenceNumber >= 0 && !m.isFinal
 }
 
-func (m *message) setTransactionID() {
+func (m *message) setTransactionId() {
 	m.transactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.senderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
 }
 
@@ -165,7 +169,7 @@ func handleMessageChannel() {
 
 			item := NewItem(m, maxProposedSeqNum)
 			heap.Push(&pq, item)
-			m.setTransactionID()
+			m.setTransactionId()
 			bMulticast(m)
 		} else { // Handling event received from a different node
 			nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
@@ -202,7 +206,7 @@ func handleMessageChannel() {
 			// reorder based on final priority
 			idx := pq.find(m.transactionId)
 			pq[idx].priority = m.sequenceNumber // update priority in pq = final priority
-			pq[idx].value = m // copy the message with the contents
+			pq[idx].value = m                   // copy the message with the contents
 			heap.Fix(pq, idx)
 
 			deliverAgreedTransactions(pq)
@@ -231,18 +235,18 @@ func allResponsesReceived(responsesReceived []bool) bool {
 }
 
 func main() {
-	var err error
 	arguments := os.Args
 	if len(arguments) != 4 {
-		fmt.Println(os.Stderr, "Expected Format: ./node [number of nodes] [port of centralized logging server]")
+		fmt.Fprintln(os.Stderr, "Expected Format: ./node [number of nodes] [port of centralized logging server]")
 		return
 	}
-	numNodes, err = strconv.Atoi(arguments[1])
+	newNumNodes, err := strconv.Atoi(arguments[1])
 	check(err)
 	hostList := parseHostTextfile("../hosts.txt")
 	agreedPort := arguments[2]
 	newNodeNum, err := strconv.Atoi(arguments[3])
 	check(err)
+	numNodes = uint8(newNumNodes)
 	localNodeNum = uint8(newNodeNum)
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
