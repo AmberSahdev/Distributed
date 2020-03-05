@@ -179,8 +179,7 @@ func handleMessageChannel() {
 			}
 		}
 		// delivery of message to ISIS handler occurs here
-		// Receiving message 2 and sending message 3 handled here
-		if m.isProposal() {
+		if m.isProposal() { // Receiving message 2 and sending message 3 handled here
 			idx := pq.find(m.transactionId)
 
 			// update priority in pq = max(proposed priority, local priority)
@@ -201,13 +200,14 @@ func handleMessageChannel() {
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
-		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
+			
+		} else if m.needsProposal() { // Receiving message 1 and sending message 2 handled here
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			item := NewItem(m, maxProposedSeqNum)
 			heap.Push(&pq, item)
 
-			// todo fix original sender
+			m.originalSender = localNodeNum
 			nodeList[m.originalSender].unicast(m)
 
 		} else if m.isFinal { // Receiving message 3 here
