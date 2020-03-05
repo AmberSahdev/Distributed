@@ -162,7 +162,7 @@ func (m message) isProposal() bool {
 }
 
 func (m *message) setTransactionID() {
-	m.transactionId = (localNodeNum << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF)
+	m.transactionId = (localNodeNum << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
 }
 
 // TODO Biggest Fuck, drains the message Channel
@@ -186,13 +186,13 @@ func handleMessageChannel() {
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
 			// find index of item in pq -> i
-			findInPriorityQueue()
+			idx := pq.find(m.transactionId)
 
 			// update priority in pq
-			if m.sequenceNumber > pq[i].priority {
-				pq[i].priority = m.sequenceNumber
+			if m.sequenceNumber > pq[idx].priority {
+				pq[idx].priority = m.sequenceNumber
 			}
-			heap.Fix(pq, i)
+			heap.Fix(pq, idx)
 
 			// check if everything ready
 			// if yes,rmulticast and set isFinal,

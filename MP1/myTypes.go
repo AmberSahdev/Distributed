@@ -19,7 +19,7 @@ type bank_message struct {
 	originalSender      uint8  // local node number of sender of original transaction
 	senderMessageNumber int64  // index of the event at the process that generated the event
 	transaction         string // sender's transaction generator string
-	transactionId       uint64 // usually going to be {originalSender, senderMessageNumber[55:0]}
+	transactionId       uint64 // unique identifier for bank_message, usually going to be {originalSender, senderMessageNumber[55:0]}, if uninitialized set to -1
 	sequenceNumber      int64  // -1 if uninitialized, used for proposal and final
 	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
 	isRMulticast        bool   // instructs receiver to multicast message

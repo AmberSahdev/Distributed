@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/heap"
+	"math"
 )
 
 // Derived from  https://golang.org/pkg/container/heap/
@@ -51,4 +52,13 @@ func (pq *PriorityQueue) update(item *Item, value string, priority int) {
 	item.value = value
 	item.priority = priority
 	heap.Fix(pq, item.index)
+}
+
+func (pq PriorityQueue) find(transactionID uint64) int {
+	for i := 0; i < pq.Len(); i++ {
+		if pq[i].value.transactionId == transactionID {
+			return i
+		}
+	}
+	return math.MaxInt32 // if nothing matches
 }
