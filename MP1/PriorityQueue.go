@@ -1,7 +1,9 @@
 package main
 
 import (
+	"container/heap"
 	"math"
+	"fmt"
 )
 
 // Derived from  https://golang.org/pkg/container/heap/
@@ -39,7 +41,7 @@ func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return pq[i].priority > pq[j].priority
+	return pq[i].priority < pq[j].priority
 }
 
 func (pq PriorityQueue) Swap(i, j int) {
@@ -63,4 +65,28 @@ func (pq *PriorityQueue) Pop() interface{} {
 	item.index = -1 // for safety
 	*pq = old[0 : n-1]
 	return item
+}
+
+func test_heap() {
+	// Some items and their priorities.
+	numNodes = 10
+	var test_m message
+	pq := make(PriorityQueue, 0)
+
+	item1 := NewItem(test_m, 5)
+	heap.Push(&pq, &item1)
+
+	item2 := NewItem(test_m, 7)
+	heap.Push(&pq, &item2)
+
+	item3 := NewItem(test_m, 2)
+	heap.Push(&pq, &item3)
+
+	item4 := NewItem(test_m, 9)
+	heap.Push(&pq, &item4)
+
+	fmt.Println(heap.Pop(&pq).(*Item).priority)
+	fmt.Println(heap.Pop(&pq).(*Item).priority)
+	fmt.Println(heap.Pop(&pq).(*Item).priority)
+	fmt.Println(heap.Pop(&pq).(*Item).priority)
 }
