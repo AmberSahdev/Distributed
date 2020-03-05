@@ -16,9 +16,9 @@ type nodeComms struct {
 type Message BankMessage
 
 type BankMessage struct {
-	OriginalSender      uint8  // local node number of sender of original transaction
+	OriginalSender      uint8  // local node number of sender of original Transaction
 	SenderMessageNumber int64  // index of the event at the process that generated the event
-	transaction         string // sender's transaction generator string
+	Transaction         string // sender's Transaction generator string
 	TransactionId       uint64 // unique identifier for BankMessage, usually going to be {OriginalSender, SenderMessageNumber[55:0]}, if uninitialized set to -1
 	SequenceNumber      int64  // -1 if uninitialized, used for proposal and final
 	IsFinal             bool   // distinguishes finalized vs proposed sequence Numbers

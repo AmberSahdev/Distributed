@@ -44,7 +44,7 @@ func (destNode *nodeComms) openOutgoingConn() {
 	m := Message{
 		OriginalSender:      localNodeNum,
 		SenderMessageNumber: 0,
-		transaction:         "",
+		Transaction:         "",
 		SequenceNumber:      -1,
 		TransactionId:       math.MaxUint64,
 		IsFinal:             false,
@@ -112,7 +112,7 @@ func handleLocalEventGenerator() {
 		m := Message{
 			OriginalSender:      localNodeNum,
 			SenderMessageNumber: -1,
-			transaction:         text,
+			Transaction:         text,
 			SequenceNumber:      -1,
 			TransactionId:       math.MaxUint64,
 			IsFinal:             false,
@@ -215,7 +215,7 @@ func handleMessageChannel() {
 				m.OriginalSender = localNodeNum
 				nodeList[localNodeNum].senderMessageNum += 1
 				m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
-				m.transaction = pq[idx].value.transaction
+				m.Transaction = pq[idx].value.Transaction
 				m.SequenceNumber = int64(pq[idx].priority)
 				rMulticast(m)
 				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
@@ -259,7 +259,7 @@ func deliverAgreedTransactions(pq PriorityQueue) {
 	for m.IsFinal {
 		result := heap.Pop(&pq).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Printf("%d %d "+result.value.transaction, result.value.SequenceNumber, commitNum)
+		fmt.Printf("%d %d "+result.value.Transaction, result.value.SequenceNumber, commitNum)
 		m = pq[0].value
 	}
 }
