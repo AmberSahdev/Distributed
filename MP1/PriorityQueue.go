@@ -1,8 +1,7 @@
-package PriorityQueue
+package main
 
 import (
 	"container/heap"
-	. "main"
 )
 
 // Derived from  https://golang.org/pkg/container/heap/

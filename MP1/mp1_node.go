@@ -155,8 +155,13 @@ func isAlreadyReceived(m message) bool {
 	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.senderMessageNumber
 }
 
+func (m message) isProposal() bool {
+	return m.sequenceNumber >= 0 && !m.isFinal
+}
+
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
+	pq := make(PriorityQueue, 0)
 	for m := range localReceivingChannel {
 		if isAlreadyReceived(m) {
 			continue
@@ -165,25 +170,22 @@ func handleMessageChannel() {
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			bMulticast(m)
-		} else { // Handling event recieved from a different node
+		} else { // Handling event received from a different node
 			nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
 			if m.isRMulticast {
 				rMulticast(m)
 			}
 		}
-
 		// delivery of message to ISIS handler occurs here
-		/*
-			if m.isProposal() {
-				m.accountForProposal()
-			}
-			if m.isDeliverable() {
-				m.deliverMessage()
-				deliverOtherDeliverableMessages()
-			} else if m.needsProposal() { // external message needing proposal
-				m.proposeSequenceNum()
-			}
-		*/
+		if m.isProposal() {
+			m.accountForProposal()
+		}
+		if m.isDeliverable() {
+			m.deliverMessage()
+			deliverOtherDeliverableMessages()
+		} else if m.needsProposal() { // external message needing proposal
+			m.proposeSequenceNum()
+		}
 	}
 }
 
