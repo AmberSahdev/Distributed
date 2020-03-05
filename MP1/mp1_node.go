@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"container/heap"
-	"crypto/des"
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
