@@ -37,6 +37,15 @@ func (destNode *nodeComms) openOutgoingConn() {
 	destNode.isConnected = true
 	numConns++
 	destNode.outbox = make(chan message)
+	m := message{
+		originalSender:      localNodeNum,
+		senderMessageNumber: 0,
+		transaction:         "",
+		sequenceNumber:      -1,
+		transactionId:       math.MaxUint64,
+		isFinal:             false,
+		isRMulticast:        false}
+	destNode.outbox <- m
 	go destNode.communicationTask()
 }
 
@@ -117,8 +126,8 @@ func waitForAllNodesSync() {
 func setupConnections(port string, hostList []string) {
 	var err error
 	var curNodeNum uint8
-	listener := openListener(port)
 	nodeList = make([]nodeComms, numNodes)
+	listener := openListener(port)
 	go handleAllIncomingConns(listener)
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
@@ -126,6 +135,7 @@ func setupConnections(port string, hostList []string) {
 		if localNodeNum == curNodeNum {
 			nodeList[curNodeNum].conn = nil
 			nodeList[curNodeNum].outbox = localReceivingChannel
+			nodeList[curNodeNum].isConnected = true
 		} else {
 			nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
 			if err == nil {
