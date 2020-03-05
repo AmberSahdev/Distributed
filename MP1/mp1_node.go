@@ -26,6 +26,7 @@ func (destNode *nodeComms) communicationTask() {
 	defer destNode.conn.Close()
 	for m := range destNode.outbox {
 		err := tcpEnc.Encode(m)
+		fmt.Println("sent m")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to send Message, receiver down?")
 			return
