@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-var numNodes int       // specified parameter, number of starting nodes
-var numConns int       // tracks number of other nodes connected to this node
+var numNodes uint8       // specified parameter, number of starting nodes
+var numConns uint8       // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var opennerMessage message
@@ -33,7 +33,7 @@ func (destNode nodeComms) unicast(m message) {
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
-	for i := 0; i < numNodes; i++ {
+	for var i uint8 = 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
 			nodeList[i].outbox <- m
 		}
