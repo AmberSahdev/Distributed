@@ -283,5 +283,6 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
+	fmt.Println("got here!")
 	handleMessageChannel()
 }
