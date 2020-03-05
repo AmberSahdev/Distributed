@@ -49,6 +49,7 @@ func (destNode *nodeComms) openOutgoingConn() {
 		TransactionId:       math.MaxUint64,
 		IsFinal:             false,
 		IsRMulticast:        false}
+	fmt.Println("push message")
 	destNode.outbox <- m
 	go destNode.communicationTask()
 }
