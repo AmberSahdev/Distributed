@@ -13,11 +13,10 @@ import (
 	"time"
 )
 
-var numNodes uint8       // specified parameter, number of starting nodes
-var numConns uint8       // tracks number of other nodes connected to this node
+var numNodes uint8     // specified parameter, number of starting nodes
+var numConns uint8     // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
-var opennerMessage message
 var localReceivingChannel chan message
 
 // Performs our current error handling
@@ -33,7 +32,8 @@ func (destNode nodeComms) unicast(m message) {
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
-	for var i uint8 = 0; i < numNodes; i++ {
+	var i uint8
+	for i = 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
 			nodeList[i].outbox <- m
 		}
@@ -138,10 +138,11 @@ func waitForAllNodesSync() {
 
 func setupConnections(port string, hostList []string) {
 	var err error
+	var curNodeNum uint8
 	listener := openListener(port)
 	go handleAllIncomingConns(listener)
 
-	for curNodeNum := 0; curNodeNum < numNodes; curNodeNum++ {
+	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 		if localNodeNum == curNodeNum {
@@ -215,7 +216,7 @@ func handleMessageChannel() {
 			// commmit agreed transacations to account
 			m = &pq[0].value // highest priority // pq[0] is element with max priority
 			for m.isFinal {
-				heap.Pop(pq)    // TODO: put it into our account balances
+				heap.Pop(pq) // TODO: put it into our account balances
 				m = &pq[0].value
 			}
 
