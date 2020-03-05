@@ -19,32 +19,6 @@ var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan message
 
-// Performs our current error handling
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
-func (destNode nodeComms) unicast(m message) {
-	destNode.outbox <- m
-}
-
-// Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
-func bMulticast(m message) {
-	var i uint8
-	for i = 0; i < numNodes; i++ {
-		if nodeList[i].isConnected && i != localNodeNum {
-			nodeList[i].outbox <- m
-		}
-	}
-}
-
-// Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
-func rMulticast(m message) {
-	m.isRMulticast = true
-	bMulticast(m)
-}
 
 func (destNode *nodeComms) communicationTask() {
 	tcpEnc := gob.NewEncoder(destNode.conn)
@@ -172,7 +146,7 @@ func (m *message) setTransactionID() {
 
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
-	// Decentralized Causal - Total Ordering Protocol
+	// Decentralized Causal + Total Ordering Protocol
 	pq := make(PriorityQueue, 0)
 	var maxFinalSeqNum int64 = 0
 	var maxProposedSeqNum int64 = 0
@@ -223,7 +197,7 @@ func handleMessageChannel() {
 			}
 			heap.Fix(pq, idx)
 
-			// commmit agreed transacations to account
+			// commit agreed transactions to account
 			m = pq[0].value // highest priority // pq[0] is element with max priority
 			for m.isFinal {
 				_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
@@ -264,11 +238,4 @@ func main() {
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
 	handleMessageChannel()
-}
-
-func max(x, y int64) int64 {
-	if x > y {
-		return x
-	}
-	return y
 }
