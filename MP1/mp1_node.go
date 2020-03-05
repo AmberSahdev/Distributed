@@ -193,17 +193,25 @@ func handleMessageChannel() {
 				pq[idx].priority = m.sequenceNumber
 			}
 			heap.Fix(pq, idx)
+			//pq[idx].responsesRecieved = pq[idx].responsesRecieved | (1 << (m.originalSender - 1)) // set bit number sender to 1 in  pq[idx].responsesRecieved
+			pq[idx].responsesRecieved[m.originalSender - 1] = true
 
-			// check if everything ready
-			// if yes,rmulticast and set isFinal,
-			// check if next message deliverable, repeat above line. if not move onto next message.
-
-			m.accountForProposal()
-			deliverDeliverableMessages()
+			// check if message ready (all nodes that are active have bit = 1 in responsesReceived) and agreed upon sequence
+			if check_ready(pq[idx].responsesRecieved) {
+				// tree traversal
+				m.isFinal = true
+				rMulticast(m)
+			}
 		} else if m.needsProposal() { // external message needing proposal
 			m.proposeSequenceNum()
 		}
 	}
+}
+
+// check if message ready (all nodes that are active have bit = 1 in responsesReceived)
+func check_ready(pq[idx].responsesRecieved []bool) bool {
+	
+	return false
 }
 
 func main() {

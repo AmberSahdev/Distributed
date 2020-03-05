@@ -12,6 +12,7 @@ type Item struct {
 	priority          int     // The priority of the item in the queue. Corresponds to largest sequence number proposed so far
 	index             int     // The index of the item in the heap. The index is needed by update and is maintained by the heap.Interface methods.
 	responsesRecieved int     // lowest bit corresponds to first node in communication, 1 means reply received, 0 means message not received
+	responsesRecieved [numNodes]bool // 1 means reply received from node, 0 means message not received
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.
