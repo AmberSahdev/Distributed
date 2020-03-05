@@ -166,10 +166,7 @@ func handleMessageChannel() {
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
-			if maxFinalSeqNum > maxProposedSeqNum {
-				maxProposedSeqNum = maxFinalSeqNum
-			}
-			maxProposedSeqNum += 1
+			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			item := NewItem(m, maxProposedSeqNum)
 			heap.Push(&pq, item)
@@ -205,11 +202,13 @@ func handleMessageChannel() {
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
-			// reply with maxProposedSeqNum + 1
-			maxProposedSeqNum += 1
-			m.sequenceNumber = maxProposedSeqNum
-			unicast()
-			// store in priority queue
+			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
+
+			item := NewItem(m, maxProposedSeqNum)
+			heap.Push(&pq, item)
+
+			// todo fix original sender
+			nodeList[m.originalSender].unicast(m)
 
 		} else if m.isFinal { // Receiving message 3 here
 			// reorder based on final priority
@@ -219,8 +218,17 @@ func handleMessageChannel() {
 			heap.Fix(&pq, idx)
 
 			deliverAgreedTransactions(pq)
+			maxFinalSeqNum = max(maxFinalSeqNum, m.sequenceNumber)
 		}
 	}
+}
+
+// finds the next proposal number to generate given the final sequence number already seen and max proposal number given
+func findProposalNumber(maxProposedSeqNum int64, maxFinalSeqNum int64) int64 {
+	if maxFinalSeqNum > maxProposedSeqNum {
+		maxProposedSeqNum = maxFinalSeqNum
+	}
+	return maxProposedSeqNum + 1
 }
 
 func deliverAgreedTransactions(pq PriorityQueue) {
