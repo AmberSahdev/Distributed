@@ -118,6 +118,7 @@ func handleLocalEventGenerator() {
 			senderMessageNumber: -1,
 			transaction:         text,
 			sequenceNumber:      -1,
+			transactionId:       -1,
 			isFinal:             false,
 			isRMulticast:        false}
 
@@ -160,6 +161,10 @@ func (m message) isProposal() bool {
 	return m.sequenceNumber >= 0 && !m.isFinal
 }
 
+func (m *message) setTransactionID() {
+	m.transactionId = (localNodeNum << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF)
+}
+
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
 	pq := make(PriorityQueue, 0)
@@ -170,6 +175,7 @@ func handleMessageChannel() {
 		if m.senderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+			m.setTransactionID()
 			bMulticast(m)
 		} else { // Handling event received from a different node
 			nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
@@ -180,7 +186,7 @@ func handleMessageChannel() {
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
 			// find index of item in pq -> i
-			findIn
+			findInPriorityQueue()
 
 			// update priority in pq
 			if m.sequenceNumber > pq[i].priority {
