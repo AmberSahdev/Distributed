@@ -136,7 +136,6 @@ func waitForAllNodesSync() {
 }
 
 func setupConnections(port string, hostList []string) {
-	var err error
 	var curNodeNum uint8
 	nodeList = make([]nodeComms, numNodes)
 	listener := openListener(port)
