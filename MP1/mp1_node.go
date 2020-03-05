@@ -15,7 +15,7 @@ import (
 
 var numNodes int     // specified parameter, number of starting nodes
 var numConns int     // tracks number of other nodes connected to this node
-var localNodeNum int // tracks local node's number
+var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan message
 
@@ -167,6 +167,7 @@ func (m *message) setTransactionID() {
 
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
+	// Decentralized Causal - Total Ordering Protocol
 	pq := make(PriorityQueue, 0)
 	for m := range localReceivingChannel {
 		if isAlreadyReceived(m) {
@@ -175,6 +176,7 @@ func handleMessageChannel() {
 		if m.senderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+
 			m.setTransactionID()
 			bMulticast(m)
 		} else { // Handling event received from a different node
@@ -186,7 +188,7 @@ func handleMessageChannel() {
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
 			// find index of item in pq -> i
-			idx := pq.find(m.transactionId)
+			idx := pq.find(m.transactionId) // TODO if we didn't find it then create that element up there somewhere
 
 			// update priority in pq
 			if m.sequenceNumber > pq[idx].priority {
@@ -196,10 +198,15 @@ func handleMessageChannel() {
 			pq[idx].responsesReceived[m.originalSender - 1] = true
 
 			// check if message ready (all nodes that are active have bit = 1 in responsesReceived) and agreed upon sequence
-			if check_ready(pq[idx].responsesReceived) {
-				// tree traversal
+			if allResponsesReceived(pq[0].responsesReceived) { // pq[0] is element with max priority
 				m.isFinal = true
-				rMulticast(m)
+				for m.isFinal{
+					rMulticast(m)
+					heap.Pop(pq)
+					heap.Fix(pq, 0)
+					m = pq[0]// next highest priority
+				}
+
 			}
 		} else if m.needsProposal() { // external message needing proposal
 			m.proposeSequenceNum()
@@ -207,9 +214,14 @@ func handleMessageChannel() {
 	}
 }
 
-// check if message ready (all nodes that are active have bit = 1 in responsesReceived)
-func check_ready(pq[idx].responsesReceived []bool) bool {
-	return false
+// check if message ready (all nodes that are active and have response Received = true in responsesReceived)
+func allResponsesReceived(responsesReceived []bool) bool {
+	for i := 0; i < numNodes; i++ {
+		if nodeList[i].isConnected && responsesReceived[i] == false {
+			return false
+		}
+	}
+	return true
 }
 
 func main() {
