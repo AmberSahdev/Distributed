@@ -167,7 +167,7 @@ func (m message) isProposal() bool {
 }
 
 func (m *message) setTransactionID() {
-	m.transactionId = (uint64(localNodeNum) << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
+	m.transactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.senderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
 }
 
 // TODO Biggest Fuck, drains the message Channel
@@ -201,6 +201,7 @@ func handleMessageChannel() {
 			}
 		}
 		// delivery of message to ISIS handler occurs here
+		// Receiving message 2 and sending message 3 handled here
 		if m.isProposal() {
 			idx := pq.find(m.transactionId)
 
@@ -228,9 +229,10 @@ func handleMessageChannel() {
 				_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
 				m = pq[0].value
 			}
-
-		} else if m.needsProposal() { // external message needing proposal
+		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
 			m.proposeSequenceNum()
+		} else if m.isFinal { // TODO Receiving message 3 here
+
 		}
 	}
 }
