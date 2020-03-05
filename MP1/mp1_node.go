@@ -195,18 +195,27 @@ func handleMessageChannel() {
 				maxFinalSeqNum = max(m.sequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(pq, idx)
-
-			// commit agreed transactions to account
-			m = pq[0].value // highest priority // pq[0] is element with max priority
-			for m.isFinal {
-				_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
-				m = pq[0].value
-			}
+			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
 			m.proposeSequenceNum()
-		} else if m.isFinal { // TODO Receiving message 3 here
+		} else if m.isFinal { // Receiving message 3 here
+			// reorder based on final priority
+			idx := pq.find(m.transactionId)
+			pq[idx].priority = m.sequenceNumber // update priority in pq = final priority
+			pq[idx].value = m // copy the message with the contents
+			heap.Fix(pq, idx)
 
+			deliverAgreedTransactions(pq)
 		}
+	}
+}
+
+func deliverAgreedTransactions(pq PriorityQueue) {
+	// commit agreed transactions to account
+	m := pq[0].value // highest priority // pq[0] is element with max priority
+	for m.isFinal {
+		_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
+		m = pq[0].value
 	}
 }
 
