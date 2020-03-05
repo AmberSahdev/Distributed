@@ -167,13 +167,16 @@ func (m message) isProposal() bool {
 }
 
 func (m *message) setTransactionID() {
-	m.transactionId = (localNodeNum << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
+	m.transactionId = (uint64(localNodeNum) << (64 - 8)) | (m.senderMessageNumber & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
 }
 
 // TODO Biggest Fuck, drains the message Channel
 func handleMessageChannel() {
 	// Decentralized Causal - Total Ordering Protocol
 	pq := make(PriorityQueue, 0)
+	var maxFinalSeqNum int64 = 0
+	var maxProposedSeqNum int64 = 0
+
 	for m := range localReceivingChannel {
 		if isAlreadyReceived(m) {
 			continue
@@ -181,7 +184,16 @@ func handleMessageChannel() {
 		if m.senderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+
+			if maxFinalSeqNum > maxProposedSeqNum {
+				maxProposedSeqNum = maxFinalSeqNum
+			}
+			maxProposedSeqNum += 1
+
 			// todo make pq node
+			item := NewItem(m, maxProposedSeqNum)
+
+			heap.Push(&pq, item)
 			m.setTransactionID()
 			bMulticast(m)
 		} else { // Handling event received from a different node
@@ -192,12 +204,11 @@ func handleMessageChannel() {
 		}
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
-			idx := pq.find(m.transactionId) // TODO if we didn't find it then create that element up there somewhere
+			idx := pq.find(m.transactionId)
 
 			// update priority in pq = max(proposed priority, local priority)
-			if m.sequenceNumber > pq[idx].priority {
-				pq[idx].priority = m.sequenceNumber
-			}
+			pq[idx].priority = max(m.sequenceNumber, pq[idx].priority)
+
 			pq[idx].responsesReceived[m.originalSender] = true
 
 			if allResponsesReceived(pq[idx].responsesReceived) {
@@ -207,17 +218,17 @@ func handleMessageChannel() {
 				nodeList[localNodeNum].senderMessageNum += 1
 				m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 				m.transaction = pq[idx].value.transaction
-				m.sequenceNumber = pq[idx].priority
-
+				m.sequenceNumber = int64(pq[idx].priority)
 				rMulticast(m)
+				maxFinalSeqNum = max(m.sequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(pq, idx)
 
 			// commmit agreed transacations to account
-			m = &pq[0].value // highest priority // pq[0] is element with max priority
+			m = pq[0].value // highest priority // pq[0] is element with max priority
 			for m.isFinal {
-				heap.Pop(pq) // TODO: put it into our account balances
-				m = &pq[0].value
+				_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
+				m = pq[0].value
 			}
 
 		} else if m.needsProposal() { // external message needing proposal
