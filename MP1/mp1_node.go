@@ -179,10 +179,7 @@ func handleMessageChannel() {
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
 			m.accountForProposal()
-		}
-		if m.isDeliverable() {
-			m.deliverMessage()
-			deliverOtherDeliverableMessages()
+			deliverDeliverableMessages()
 		} else if m.needsProposal() { // external message needing proposal
 			m.proposeSequenceNum()
 		}

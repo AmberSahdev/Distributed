@@ -3,7 +3,7 @@ package main
 import "net"
 
 type nodeComms struct {
-	senderMessageNum int      //
+	senderMessageNum int64    //
 	port             string   // outgoing node's port
 	address          string   // outgoing node's address
 	conn             net.Conn // TODO find out if pass by value or pointer is better here
@@ -16,10 +16,11 @@ type nodeComms struct {
 type message bank_message
 
 type bank_message struct {
-	originalSender      int    // local node number of sender of original transaction
-	senderMessageNumber int    // index of the event at the process that generated the event
+	originalSender      uint8  // local node number of sender of original transaction
+	senderMessageNumber int64  // index of the event at the process that generated the event
 	transaction         string // sender's transaction generator string
-	sequenceNumber      int    // -1 if uninitialized, used for proposal and final
+	transactionId       uint64 // usually going to be {originalSender, senderMessageNumber[55:0]}
+	sequenceNumber      int64  // -1 if uninitialized, used for proposal and final
 	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
 	isRMulticast        bool   // instructs receiver to multicast message
 }
