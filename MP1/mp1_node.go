@@ -67,6 +67,7 @@ func receiveIncomingData(conn net.Conn) {
 	tcpDecode := gob.NewDecoder(conn)
 	err := tcpDecode.Decode(&m)
 	incomingNodeNum := m.originalSender
+	fmt.Println("Fuck Me")
 	if !nodeList[incomingNodeNum].isConnected {
 		// set up a new connection
 		nodeList[incomingNodeNum].openOutgoingConn()
