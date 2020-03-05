@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+var commitNum int
 var numNodes uint8     // specified parameter, number of starting nodes
 var numConns uint8     // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
@@ -235,7 +236,9 @@ func deliverAgreedTransactions(pq PriorityQueue) {
 	// commit agreed transactions to account
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.isFinal {
-		_ = heap.Pop(&pq).(*Item) // TODO: put it into our account balances
+		result := heap.Pop(&pq).(*Item) // TODO: put it into our account balances
+		commitNum++
+		fmt.Printf("%d %d "+result.value.transaction, result.value.sequenceNumber, commitNum)
 		m = pq[0].value
 	}
 }
@@ -257,6 +260,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Expected Format: ./node [number of nodes] [port of centralized logging server]")
 		return
 	}
+	commitNum = 0
 	newNumNodes, err := strconv.Atoi(arguments[1])
 	check(err)
 	hostList := parseHostTextfile("../hosts.txt")
