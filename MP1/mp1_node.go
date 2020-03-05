@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"container/heap"
+	"crypto/des"
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
@@ -38,19 +39,23 @@ func (destNode *nodeComms) communicationTask() {
 }
 
 func (destNode *nodeComms) openOutgoingConn() {
-	destNode.isConnected = true
-	numConns++
-	destNode.outbox = make(chan Message, 1024)
-	m := Message{
-		OriginalSender:      localNodeNum,
-		SenderMessageNumber: 0,
-		Transaction:         "",
-		SequenceNumber:      -1,
-		TransactionId:       math.MaxUint64,
-		IsFinal:             false,
-		IsRMulticast:        false}
-	go destNode.communicationTask()
-	destNode.outbox <- m
+	var err error
+	destNode.conn, err = net.Dial("tcp", (destNode.address)+":"+(destNode.port))
+	if err == nil {
+		destNode.isConnected = true
+		numConns++
+		destNode.outbox = make(chan Message, 1024)
+		m := Message{
+			OriginalSender:      localNodeNum,
+			SenderMessageNumber: 0,
+			Transaction:         "",
+			SequenceNumber:      -1,
+			TransactionId:       math.MaxUint64,
+			IsFinal:             false,
+			IsRMulticast:        false}
+		go destNode.communicationTask()
+		destNode.outbox <- m
+	}
 }
 
 // ran when the incoming connection to this node throws and errror
@@ -145,13 +150,7 @@ func setupConnections(port string, hostList []string) {
 			nodeList[curNodeNum].outbox = localReceivingChannel
 			nodeList[curNodeNum].isConnected = true
 		} else {
-			nodeList[curNodeNum].conn, err = net.Dial("tcp", (nodeList[curNodeNum].address)+":"+(nodeList[curNodeNum].port))
-			if err == nil {
-				fmt.Println("Dialed in!")
-				nodeList[curNodeNum].openOutgoingConn()
-			} else {
-				fmt.Println(err)
-			}
+			nodeList[curNodeNum].openOutgoingConn()
 		}
 	}
 	waitForAllNodesSync()
