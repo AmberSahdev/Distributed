@@ -24,6 +24,7 @@ var localReceivingChannel chan Message
 func (destNode *nodeComms) communicationTask() {
 	tcpEnc := gob.NewEncoder(destNode.conn)
 	defer destNode.conn.Close()
+	fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
 		fmt.Println("about to send m")
 		err := tcpEnc.Encode(m)
@@ -67,6 +68,7 @@ func parseHostTextfile(path string) []string {
 func receiveIncomingData(conn net.Conn) {
 	var m Message
 	tcpDecode := gob.NewDecoder(conn)
+	fmt.Println("Ready To Receive Data")
 	err := tcpDecode.Decode(&m)
 	incomingNodeNum := m.OriginalSender
 	fmt.Println("Fuck Me")
@@ -140,7 +142,7 @@ func setupConnections(port string, hostList []string) {
 			nodeList[curNodeNum].outbox = localReceivingChannel
 			nodeList[curNodeNum].isConnected = true
 		} else {
-			nodeList[curNodeNum].conn, err = net.Dial("tcp", nodeList[curNodeNum].address+":"+nodeList[curNodeNum].port)
+			nodeList[curNodeNum].conn, err = net.Dial("tcp", (nodeList[curNodeNum].address)+":"+(nodeList[curNodeNum].port))
 			if err == nil {
 				nodeList[curNodeNum].openOutgoingConn()
 			}
@@ -285,6 +287,5 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
-	fmt.Println("got here!")
 	handleMessageChannel()
 }
