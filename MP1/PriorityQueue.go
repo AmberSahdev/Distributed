@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/heap"
 	"math"
 )
 
@@ -64,11 +63,4 @@ func (pq *PriorityQueue) Pop() interface{} {
 	item.index = -1 // for safety
 	*pq = old[0 : n-1]
 	return item
-}
-
-// update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) update(item *Item, value string, priority int) {
-	item.value = value
-	item.priority = priority
-	heap.Fix(pq, item.index)
 }

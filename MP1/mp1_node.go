@@ -135,12 +135,16 @@ func setupConnections(port string, hostList []string) {
 	waitForAllNodesSync()
 }
 
-func isAlreadyReceived(m message) bool {
+func (m *message) isAlreadyReceived() bool {
 	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.senderMessageNumber
 }
 
-func (m message) isProposal() bool {
+func (m *message) isProposal() bool {
 	return m.sequenceNumber >= 0 && !m.isFinal
+}
+
+func (m *message) needsProposal() bool {
+	return !m.isFinal && m.sequenceNumber == -1
 }
 
 func (m *message) setTransactionId() {
@@ -155,7 +159,7 @@ func handleMessageChannel() {
 	var maxProposedSeqNum int64 = 0
 
 	for m := range localReceivingChannel {
-		if isAlreadyReceived(m) {
+		if m.isAlreadyReceived() {
 			continue
 		}
 		if m.senderMessageNumber < 0 { // Handling of a local event
@@ -198,7 +202,7 @@ func handleMessageChannel() {
 				rMulticast(m)
 				maxFinalSeqNum = max(m.sequenceNumber, maxFinalSeqNum)
 			}
-			heap.Fix(pq, idx)
+			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // TODO Receiving message 1 and sending message 2 handled here
 			// reply with maxProposedSeqNum + 1
@@ -207,13 +211,12 @@ func handleMessageChannel() {
 			unicast()
 			// store in priority queue
 
-
 		} else if m.isFinal { // Receiving message 3 here
 			// reorder based on final priority
 			idx := pq.find(m.transactionId)
 			pq[idx].priority = m.sequenceNumber // update priority in pq = final priority
 			pq[idx].value = m                   // copy the message with the contents
-			heap.Fix(pq, idx)
+			heap.Fix(&pq, idx)
 
 			deliverAgreedTransactions(pq)
 		}
@@ -224,7 +227,7 @@ func deliverAgreedTransactions(pq PriorityQueue) {
 	// commit agreed transactions to account
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.isFinal {
-		_ = heap.Pop(pq).(*Item) // TODO: put it into our account balances
+		_ = heap.Pop(&pq).(*Item) // TODO: put it into our account balances
 		m = pq[0].value
 	}
 }
