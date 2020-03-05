@@ -118,8 +118,8 @@ func setupConnections(port string, hostList []string) {
 	var err error
 	var curNodeNum uint8
 	listener := openListener(port)
+	nodeList = make([]nodeComms, numNodes)
 	go handleAllIncomingConns(listener)
-
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
