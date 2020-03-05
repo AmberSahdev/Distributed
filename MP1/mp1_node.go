@@ -196,8 +196,7 @@ func handleMessageChannel() {
 			}
 			heap.Fix(pq, idx)
 			pq[idx].responsesReceived[m.originalSender - 1] = true
-
-			// check if message ready (all nodes that are active have bit = 1 in responsesReceived) and agreed upon sequence
+			
 			if allResponsesReceived(pq[0].responsesReceived) { // pq[0] is element with max priority
 				m.isFinal = true
 				for m.isFinal{
