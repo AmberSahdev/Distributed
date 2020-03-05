@@ -190,9 +190,7 @@ func handleMessageChannel() {
 			}
 			maxProposedSeqNum += 1
 
-			// todo make pq node
 			item := NewItem(m, maxProposedSeqNum)
-
 			heap.Push(&pq, item)
 			m.setTransactionID()
 			bMulticast(m)
