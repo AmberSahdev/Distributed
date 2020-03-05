@@ -193,11 +193,10 @@ func handleMessageChannel() {
 				pq[idx].priority = m.sequenceNumber
 			}
 			heap.Fix(pq, idx)
-			//pq[idx].responsesRecieved = pq[idx].responsesRecieved | (1 << (m.originalSender - 1)) // set bit number sender to 1 in  pq[idx].responsesRecieved
-			pq[idx].responsesRecieved[m.originalSender - 1] = true
+			pq[idx].responsesReceived[m.originalSender - 1] = true
 
 			// check if message ready (all nodes that are active have bit = 1 in responsesReceived) and agreed upon sequence
-			if check_ready(pq[idx].responsesRecieved) {
+			if check_ready(pq[idx].responsesReceived) {
 				// tree traversal
 				m.isFinal = true
 				rMulticast(m)
@@ -209,8 +208,7 @@ func handleMessageChannel() {
 }
 
 // check if message ready (all nodes that are active have bit = 1 in responsesReceived)
-func check_ready(pq[idx].responsesRecieved []bool) bool {
-	
+func check_ready(pq[idx].responsesReceived []bool) bool {
 	return false
 }
 
