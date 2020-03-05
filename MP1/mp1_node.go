@@ -180,7 +180,7 @@ func handleMessageChannel() {
 		if m.senderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
-
+			// todo make pq node
 			m.setTransactionID()
 			bMulticast(m)
 		} else { // Handling event received from a different node
@@ -198,10 +198,16 @@ func handleMessageChannel() {
 				pq[idx].priority = m.sequenceNumber
 			}
 			pq[idx].responsesReceived[m.originalSender] = true
+
 			if allResponsesReceived(pq[idx].responsesReceived) {
-				m.isFinal = true
 				pq[idx].value.isFinal = true
-				// todo fix up M before multicasting it
+				m.isFinal = true
+				m.originalSender = localNodeNum
+				nodeList[localNodeNum].senderMessageNum += 1
+				m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+				m.transaction = pq[idx].value.transaction
+				m.sequenceNumber = pq[idx].priority
+
 				rMulticast(m)
 			}
 			heap.Fix(pq, idx)
@@ -210,7 +216,7 @@ func handleMessageChannel() {
 			m = &pq[0].value // highest priority // pq[0] is element with max priority
 			for m.isFinal {
 				heap.Pop(pq)    // TODO: put it into our account balances
-				m = &pq[0].value // next highest priority
+				m = &pq[0].value
 			}
 
 		} else if m.needsProposal() { // external message needing proposal
