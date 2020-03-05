@@ -19,7 +19,7 @@ var numNodes uint8     // specified parameter, number of starting nodes
 var numConns uint8     // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
-var localReceivingChannel chan message
+var localReceivingChannel chan Message
 
 func (destNode *nodeComms) communicationTask() {
 	tcpEnc := gob.NewEncoder(destNode.conn)
@@ -27,7 +27,7 @@ func (destNode *nodeComms) communicationTask() {
 	for m := range destNode.outbox {
 		err := tcpEnc.Encode(m)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to send message, receiver down?")
+			fmt.Fprintln(os.Stderr, "Failed to send Message, receiver down?")
 			return
 		}
 	}
@@ -36,15 +36,15 @@ func (destNode *nodeComms) communicationTask() {
 func (destNode *nodeComms) openOutgoingConn() {
 	destNode.isConnected = true
 	numConns++
-	destNode.outbox = make(chan message)
-	m := message{
-		originalSender:      localNodeNum,
-		senderMessageNumber: 0,
+	destNode.outbox = make(chan Message)
+	m := Message{
+		OriginalSender:      localNodeNum,
+		SenderMessageNumber: 0,
 		transaction:         "",
-		sequenceNumber:      -1,
-		transactionId:       math.MaxUint64,
-		isFinal:             false,
-		isRMulticast:        false}
+		SequenceNumber:      -1,
+		TransactionId:       math.MaxUint64,
+		IsFinal:             false,
+		IsRMulticast:        false}
 	destNode.outbox <- m
 	go destNode.communicationTask()
 }
@@ -63,10 +63,10 @@ func parseHostTextfile(path string) []string {
 }
 
 func receiveIncomingData(conn net.Conn) {
-	var m message
+	var m Message
 	tcpDecode := gob.NewDecoder(conn)
 	err := tcpDecode.Decode(&m)
-	incomingNodeNum := m.originalSender
+	incomingNodeNum := m.OriginalSender
 	fmt.Println("Fuck Me")
 	if !nodeList[incomingNodeNum].isConnected {
 		// set up a new connection
@@ -102,14 +102,14 @@ func handleLocalEventGenerator() {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		text := scanner.Text()
-		m := message{
-			originalSender:      localNodeNum,
-			senderMessageNumber: -1,
+		m := Message{
+			OriginalSender:      localNodeNum,
+			SenderMessageNumber: -1,
 			transaction:         text,
-			sequenceNumber:      -1,
-			transactionId:       math.MaxUint64,
-			isFinal:             false,
-			isRMulticast:        false}
+			SequenceNumber:      -1,
+			TransactionId:       math.MaxUint64,
+			IsFinal:             false,
+			IsRMulticast:        false}
 
 		localReceivingChannel <- m
 	}
@@ -147,23 +147,23 @@ func setupConnections(port string, hostList []string) {
 	waitForAllNodesSync()
 }
 
-func (m *message) isAlreadyReceived() bool {
-	return m.isRMulticast && nodeList[m.originalSender].senderMessageNum >= m.senderMessageNumber
+func (m *Message) isAlreadyReceived() bool {
+	return m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber
 }
 
-func (m *message) isProposal() bool {
-	return m.sequenceNumber >= 0 && !m.isFinal
+func (m *Message) isProposal() bool {
+	return m.SequenceNumber >= 0 && !m.IsFinal
 }
 
-func (m *message) needsProposal() bool {
-	return !m.isFinal && m.sequenceNumber == -1
+func (m *Message) needsProposal() bool {
+	return !m.IsFinal && m.SequenceNumber == -1
 }
 
-func (m *message) setTransactionId() {
-	m.transactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.senderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {originalSender, senderMessageNumber[55:0]}
+func (m *Message) setTransactionId() {
+	m.TransactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.SenderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {OriginalSender, SenderMessageNumber[55:0]}
 }
 
-// TODO Biggest Fuck, drains the message Channel
+// TODO Biggest Fuck, drains the Message Channel
 func handleMessageChannel() {
 	// Decentralized Causal + Total Ordering Protocol
 	pq := make(PriorityQueue, 0)
@@ -174,9 +174,9 @@ func handleMessageChannel() {
 		if m.isAlreadyReceived() {
 			continue
 		}
-		if m.senderMessageNumber < 0 { // Handling of a local event
+		if m.SenderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
-			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
@@ -185,52 +185,52 @@ func handleMessageChannel() {
 			m.setTransactionId()
 			bMulticast(m)
 		} else { // Handling event received from a different node
-			nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
-			if m.isRMulticast {
+			nodeList[m.OriginalSender].senderMessageNum = m.SequenceNumber
+			if m.IsRMulticast {
 				rMulticast(m)
 			}
 		}
-		// delivery of message to ISIS handler occurs here
-		if m.isProposal() { // Receiving message 2 and sending message 3 handled here
-			idx := pq.find(m.transactionId)
+		// delivery of Message to ISIS handler occurs here
+		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
+			idx := pq.find(m.TransactionId)
 
 			// update priority in pq = max(proposed priority, local priority)
-			pq[idx].priority = max(m.sequenceNumber, pq[idx].priority)
+			pq[idx].priority = max(m.SequenceNumber, pq[idx].priority)
 
-			pq[idx].responsesReceived[m.originalSender] = true
+			pq[idx].responsesReceived[m.OriginalSender] = true
 
 			if allResponsesReceived(pq[idx].responsesReceived) {
-				pq[idx].value.isFinal = true
-				m.isFinal = true
-				m.originalSender = localNodeNum
+				pq[idx].value.IsFinal = true
+				m.IsFinal = true
+				m.OriginalSender = localNodeNum
 				nodeList[localNodeNum].senderMessageNum += 1
-				m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
+				m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 				m.transaction = pq[idx].value.transaction
-				m.sequenceNumber = int64(pq[idx].priority)
+				m.SequenceNumber = int64(pq[idx].priority)
 				rMulticast(m)
-				maxFinalSeqNum = max(m.sequenceNumber, maxFinalSeqNum)
+				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
 
-		} else if m.needsProposal() { // Receiving message 1 and sending message 2 handled here
+		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			item := NewItem(m, maxProposedSeqNum)
 			heap.Push(&pq, &item)
 
-			m.originalSender = localNodeNum
-			nodeList[m.originalSender].unicast(m)
+			m.OriginalSender = localNodeNum
+			nodeList[m.OriginalSender].unicast(m)
 
-		} else if m.isFinal { // Receiving message 3 here
+		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			idx := pq.find(m.transactionId)
-			pq[idx].priority = m.sequenceNumber // update priority in pq = final priority
-			pq[idx].value = m                   // copy the message with the contents
+			idx := pq.find(m.TransactionId)
+			pq[idx].priority = m.SequenceNumber // update priority in pq = final priority
+			pq[idx].value = m                   // copy the Message with the contents
 			heap.Fix(&pq, idx)
 
 			deliverAgreedTransactions(pq)
-			maxFinalSeqNum = max(maxFinalSeqNum, m.sequenceNumber)
+			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
 		}
 	}
 }
@@ -246,15 +246,15 @@ func findProposalNumber(maxProposedSeqNum int64, maxFinalSeqNum int64) int64 {
 func deliverAgreedTransactions(pq PriorityQueue) {
 	// commit agreed transactions to account
 	m := pq[0].value // highest priority // pq[0] is element with max priority
-	for m.isFinal {
+	for m.IsFinal {
 		result := heap.Pop(&pq).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Printf("%d %d "+result.value.transaction, result.value.sequenceNumber, commitNum)
+		fmt.Printf("%d %d "+result.value.transaction, result.value.SequenceNumber, commitNum)
 		m = pq[0].value
 	}
 }
 
-// check if message ready (all nodes that are active and have response Received = true in responsesReceived)
+// check if Message ready (all nodes that are active and have response Received = true in responsesReceived)
 func allResponsesReceived(responsesReceived []bool) bool {
 	var i uint8
 	for i = 0; i < numNodes; i++ {

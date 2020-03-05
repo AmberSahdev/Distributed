@@ -7,20 +7,20 @@ type nodeComms struct {
 	port             string   // outgoing node's port
 	address          string   // outgoing node's address
 	conn             net.Conn // TODO find out if pass by value or pointer is better here
-	outbox           chan message
+	outbox           chan Message
 	isConnected      bool
 }
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
 // types for the decoded result
-type message bank_message
+type Message BankMessage
 
-type bank_message struct {
-	originalSender      uint8  // local node number of sender of original transaction
-	senderMessageNumber int64  // index of the event at the process that generated the event
+type BankMessage struct {
+	OriginalSender      uint8  // local node number of sender of original transaction
+	SenderMessageNumber int64  // index of the event at the process that generated the event
 	transaction         string // sender's transaction generator string
-	transactionId       uint64 // unique identifier for bank_message, usually going to be {originalSender, senderMessageNumber[55:0]}, if uninitialized set to -1
-	sequenceNumber      int64  // -1 if uninitialized, used for proposal and final
-	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
-	isRMulticast        bool   // instructs receiver to multicast message
+	TransactionId       uint64 // unique identifier for BankMessage, usually going to be {OriginalSender, SenderMessageNumber[55:0]}, if uninitialized set to -1
+	SequenceNumber      int64  // -1 if uninitialized, used for proposal and final
+	IsFinal             bool   // distinguishes finalized vs proposed sequence Numbers
+	IsRMulticast        bool   // instructs receiver to multicast Message
 }
