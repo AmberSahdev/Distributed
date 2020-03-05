@@ -180,8 +180,9 @@ func handleMessageChannel() {
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
 			// find index of item in pq -> i
-			// update priority in pq
+			findIn
 
+			// update priority in pq
 			if m.sequenceNumber > pq[i].priority {
 				pq[i].priority = m.sequenceNumber
 			}
