@@ -82,7 +82,7 @@ func receiveIncomingData(conn net.Conn) {
 		nodeList[incomingNodeNum].openOutgoingConn()
 	}
 	defer nodeList[incomingNodeNum].closeOutgoingConn()
-	for err != nil {
+	for err == nil {
 		localReceivingChannel <- m
 		err = tcpDecode.Decode(&m)
 	}
