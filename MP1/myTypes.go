@@ -1,5 +1,7 @@
 package main
 
+import "net"
+
 type nodeComms struct {
 	senderMessageNum int      //
 	port             string   // outgoing node's port
@@ -11,7 +13,7 @@ type nodeComms struct {
 
 // Todo define an actual encode & decode method for this and settle on a/many concrete
 // types for the decoded result
-export type message bank_message
+type message bank_message
 
 type bank_message struct {
 	originalSender      int    // local node number of sender of original transaction

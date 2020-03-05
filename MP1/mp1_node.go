@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
-	. "main"
 	"net"
 	"os"
 	"strconv"
@@ -27,19 +26,11 @@ func check(e error) {
 }
 
 func (destNode nodeComms) unicast(m message) {
-	if m.originalSender == localNodeNum {
-		nodeList[localNodeNum].senderMessageNum++
-		m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
-	}
 	destNode.outbox <- m
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
 func bMulticast(m message) {
-	if m.originalSender == localNodeNum {
-		nodeList[localNodeNum].senderMessageNum++
-		m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
-	}
 	for i := 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
 			nodeList[i].outbox <- m
@@ -182,7 +173,17 @@ func handleMessageChannel() {
 		}
 
 		// delivery of message to ISIS handler occurs here
-
+		/*
+			if m.isProposal() {
+				m.accountForProposal()
+			}
+			if m.isDeliverable() {
+				m.deliverMessage()
+				deliverOtherDeliverableMessages()
+			} else if m.needsProposal() { // external message needing proposal
+				m.proposeSequenceNum()
+			}
+		*/
 	}
 }
 
