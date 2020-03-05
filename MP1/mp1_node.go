@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"container/heap"
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
@@ -178,6 +179,18 @@ func handleMessageChannel() {
 		}
 		// delivery of message to ISIS handler occurs here
 		if m.isProposal() {
+			// find index of item in pq -> i
+			// update priority in pq
+
+			if m.sequenceNumber > pq[i].priority {
+				pq[i].priority = m.sequenceNumber
+			}
+			heap.Fix(pq, i)
+
+			// check if everything ready
+			// if yes,rmulticast and set isFinal,
+			// check if next message deliverable, repeat above line. if not move onto next message.
+
 			m.accountForProposal()
 			deliverDeliverableMessages()
 		} else if m.needsProposal() { // external message needing proposal
@@ -199,4 +212,11 @@ func main() {
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
 	handleMessageChannel()
+}
+
+func max(x, y int64) int64 {
+	if x > y {
+		return x
+	}
+	return y
 }
