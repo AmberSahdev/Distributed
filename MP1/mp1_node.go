@@ -22,7 +22,7 @@ var nodeList []nodeComms
 var localReceivingChannel chan Message
 
 func (destNode *nodeComms) communicationTask() {
-	fmt.Println("Ready To Receive m's")
+	fmt.Println("preparing To Receive m's")
 	tcpEnc := gob.NewEncoder(destNode.conn)
 	defer destNode.conn.Close()
 	fmt.Println("Ready To Receive m's")
@@ -146,6 +146,8 @@ func setupConnections(port string, hostList []string) {
 			nodeList[curNodeNum].conn, err = net.Dial("tcp", (nodeList[curNodeNum].address)+":"+(nodeList[curNodeNum].port))
 			if err == nil {
 				nodeList[curNodeNum].openOutgoingConn()
+			} else {
+				fmt.Println(err)
 			}
 		}
 	}
