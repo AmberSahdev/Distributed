@@ -261,6 +261,7 @@ func main() {
 		return
 	}
 	commitNum = 0
+	numConns = 1
 	newNumNodes, err := strconv.Atoi(arguments[1])
 	check(err)
 	hostList := parseHostTextfile("../hosts.txt")
