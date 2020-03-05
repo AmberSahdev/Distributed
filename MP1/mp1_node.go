@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	. "main"
 	"net"
 	"os"
 	"strconv"
@@ -17,28 +18,6 @@ var numConns int     // tracks number of other nodes connected to this node
 var localNodeNum int // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan message
-
-type nodeComms struct {
-	senderMessageNum int      //
-	port             string   // outgoing node's port
-	address          string   // outgoing node's address
-	conn             net.Conn // TODO find out if pass by value or pointer is better here
-	outbox           chan message
-	isConnected      bool
-}
-
-// Todo define an actual encode & decode method for this and settle on a/many concrete
-// types for the decoded result
-type message bank_message
-
-type bank_message struct {
-	originalSender      int    // local node number of sender of original transaction
-	senderMessageNumber int    // index of the event at the process that generated the event
-	transaction         string // sender's transaction generator string
-	sequenceNumber      int    // -1 if uninitialized, used for proposal and final
-	isFinal             bool   // distinguishes finalized vs proposed sequence Numbers
-	isRMulticast        bool   // instructs receiver to multicast message
-}
 
 // Performs our current error handling
 func check(e error) {
@@ -191,16 +170,17 @@ func handleMessageChannel() {
 		if isAlreadyReceived(m) {
 			continue
 		}
-		if m.senderMessageNumber < 0 {
-			// We are handling a local event.
+		if m.senderMessageNumber < 0 { // Handling of a local event
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.senderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			bMulticast(m)
+		} else { // Handling event recieved from a different node
+			nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
+			if m.isRMulticast {
+				rMulticast(m)
+			}
 		}
-		nodeList[m.originalSender].senderMessageNum = m.sequenceNumber
-		if m.isRMulticast {
-			rMulticast(m)
-		}
+
 		// delivery of message to ISIS handler occurs here
 
 	}
