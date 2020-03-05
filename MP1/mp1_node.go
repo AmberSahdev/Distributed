@@ -88,6 +88,7 @@ func receiveIncomingData(conn net.Conn) {
 	}
 	now := time.Now()
 	nanoseconds := float64(now.UnixNano()) / 1e9
+	fmt.Println(err)
 	fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
 }
 
