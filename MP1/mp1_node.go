@@ -89,11 +89,13 @@ func receiveIncomingData(conn net.Conn) {
 
 func handleAllIncomingConns(listener net.Listener) {
 	defer listener.Close()
-	for {
-		conn, err := listener.Accept()
-		check(err)
+	var conn net.Conn
+	var err error = nil
+	for err == nil {
+		conn, err = listener.Accept()
 		go receiveIncomingData(conn) // open up a go routine
 	}
+	fmt.Println("ERROR receiving incoming connections")
 }
 
 func openListener(port string) net.Listener {
