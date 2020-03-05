@@ -13,10 +13,11 @@ import (
 	"time"
 )
 
-var numNodes int     // specified parameter, number of starting nodes
-var numConns int     // tracks number of other nodes connected to this node
+var numNodes int       // specified parameter, number of starting nodes
+var numConns int       // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
+var opennerMessage message
 var localReceivingChannel chan message
 
 // Performs our current error handling
@@ -78,19 +79,22 @@ func parseHostTextfile(path string) []string {
 }
 
 func receiveIncomingData(conn net.Conn) {
-	incomingNodeNum := -1 // no known node number yet
 	var m message
 	tcpDecode := gob.NewDecoder(conn)
-	for {
-		err := tcpDecode.Decode(&m)
-		if err != nil {
-			now := time.Now()
-			nanoseconds := float64(now.UnixNano()) / 1e9
-			fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
-			return
-		}
-		localReceivingChannel <- m
+	err := tcpDecode.Decode(&m)
+	incomingNodeNum := m.originalSender
+	if !nodeList[incomingNodeNum].isConnected {
+		// set up a new connection
+		nodeList[incomingNodeNum].openOutgoingConn()
 	}
+	defer nodeList[incomingNodeNum].closeOutgoingConn()
+	for err != nil {
+		localReceivingChannel <- m
+		err = tcpDecode.Decode(&m)
+	}
+	now := time.Now()
+	nanoseconds := float64(now.UnixNano()) / 1e9
+	fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
 }
 
 func handleAllIncomingConns(listener net.Listener) {
@@ -195,15 +199,15 @@ func handleMessageChannel() {
 				pq[idx].priority = m.sequenceNumber
 			}
 			heap.Fix(pq, idx)
-			pq[idx].responsesReceived[m.originalSender - 1] = true
-			
+			pq[idx].responsesReceived[m.originalSender-1] = true
+
 			if allResponsesReceived(pq[0].responsesReceived) { // pq[0] is element with max priority
 				m.isFinal = true
-				for m.isFinal{
+				for m.isFinal {
 					rMulticast(m)
 					heap.Pop(pq)
 					heap.Fix(pq, 0)
-					m = pq[0]// next highest priority
+					m = pq[0] // next highest priority
 				}
 
 			}
@@ -224,15 +228,19 @@ func allResponsesReceived(responsesReceived []bool) bool {
 }
 
 func main() {
+	var err error
 	arguments := os.Args
 	if len(arguments) != 4 {
 		fmt.Println(os.Stderr, "Expected Format: ./node [number of nodes] [port of centralized logging server]")
 		return
 	}
-	numNodes, _ = strconv.Atoi(arguments[1])
+	numNodes, err = strconv.Atoi(arguments[1])
+	check(err)
 	hostList := parseHostTextfile("../hosts.txt")
 	agreedPort := arguments[2]
-	localNodeNum, _ = strconv.Atoi(arguments[3])
+	newNodeNum, err := strconv.Atoi(arguments[3])
+	check(err)
+	localNodeNum = uint8(newNodeNum)
 	setupConnections(agreedPort, hostList)
 	go handleLocalEventGenerator()
 	handleMessageChannel()

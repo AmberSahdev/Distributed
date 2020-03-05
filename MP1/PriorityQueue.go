@@ -65,7 +65,7 @@ func (pq *PriorityQueue) update(item *Item, value string, priority int) {
 }
 
 func (pq PriorityQueue) find(transactionID uint64) int {
-	for i := 0; i < pq.Len(); i++ {
+	for i := 0; i < len(pq); i++ {
 		if pq[i].value.transactionId == transactionID {
 			return i
 		}
