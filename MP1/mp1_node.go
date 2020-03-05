@@ -108,7 +108,7 @@ func handleLocalEventGenerator() {
 
 // TODO figure out how to block until everyone is connected
 func waitForAllNodesSync() {
-	time.Sleep(10)
+	time.Sleep(10000)
 	if numConns != numNodes {
 		fmt.Fprintf(os.Stderr, "numConns: %d, numNodes: %d", numConns, numNodes)
 	}
