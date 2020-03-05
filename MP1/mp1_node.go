@@ -25,6 +25,7 @@ func (destNode *nodeComms) communicationTask() {
 	tcpEnc := gob.NewEncoder(destNode.conn)
 	defer destNode.conn.Close()
 	for m := range destNode.outbox {
+		fmt.Println("about to send m")
 		err := tcpEnc.Encode(m)
 		fmt.Println("sent m")
 		if err != nil {
