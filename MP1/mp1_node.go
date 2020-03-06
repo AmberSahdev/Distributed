@@ -290,7 +290,7 @@ func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	for m.IsFinal {
 		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Println("Delivering Transaction:", result.value.Transaction, "SequenceNumber:", result.value.SequenceNumber, "commitNum:", commitNum)
+		fmt.Println("Delivering Transaction Message:", result.value, "commitNum:", commitNum)
 		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
