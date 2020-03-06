@@ -161,7 +161,7 @@ func setupConnections(hostList []string) {
 }
 
 func (m *Message) isAlreadyReceived() bool {
-	return (m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber) || (m.IsRMulticast && m.OriginalSender == localNodeNum)
+	return m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber
 }
 
 func (m *Message) isProposal() bool {
