@@ -195,9 +195,7 @@ func handleMessageChannel() {
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-
-			item := NewItem(m, maxProposedSeqNum)
-			heap.Push(&pq, &item)
+			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 			m.setTransactionId()
 			bMulticast(m)
 			continue
@@ -240,9 +238,7 @@ func handleMessageChannel() {
 			fmt.Println(m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-
-			item := NewItem(m, maxProposedSeqNum)
-			heap.Push(&pq, &item)
+			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 
 			prevSender := m.OriginalSender
 			m.OriginalSender = localNodeNum

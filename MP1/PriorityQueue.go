@@ -15,14 +15,13 @@ type Item struct {
 	responsesReceived []bool  // 1 means reply received from node, 0 means Message not received
 }
 
-func NewItem(m Message, priorityNum int64) Item {
-	var item = Item{
+func NewItem(m Message, priorityNum int64) *Item {
+	return &Item{
 		value:             m,
 		priority:          priorityNum,
 		index:             -1,
 		responsesReceived: make([]bool, numNodes),
 	}
-	return item
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.
