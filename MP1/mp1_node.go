@@ -278,11 +278,17 @@ func findProposalNumber(maxProposedSeqNum int64, maxFinalSeqNum int64) int64 {
 
 func deliverAgreedTransactions(pq PriorityQueue) {
 	// commit agreed transactions to account
+	if len(pq) == 0 {
+		return
+	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
 		result := heap.Pop(&pq).(*Item) // TODO: put it into our account balances
 		commitNum++
 		fmt.Printf("%d %d "+result.value.Transaction, result.value.SequenceNumber, commitNum)
+		if len(pq) == 0 {
+			return
+		}
 		m = pq[0].value
 	}
 }
