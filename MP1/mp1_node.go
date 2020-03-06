@@ -255,7 +255,7 @@ func handleMessageChannel() {
 			fmt.Println("Sent Proposal:", m)
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			fmt.Println("AGREED ON PRIORITY:", m.Transaction)
+			fmt.Println("Receiving Message 3 Agreed on Priority:", m.Transaction)
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
 				panic("FIND RETURNED MAX INDEX")
