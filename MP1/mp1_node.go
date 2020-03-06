@@ -31,7 +31,7 @@ func (destNode *nodeComms) communicationTask() {
 		err := tcpEnc.Encode(m)
 		// fmt.Println("sent m")
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to send Message, receiver down?")
+			fmt.Println("Failed to send Message, receiver down?")
 			return
 		}
 	}
@@ -132,7 +132,7 @@ func handleLocalEventGenerator() {
 func waitForAllNodesSync() {
 	time.Sleep(5 * time.Second)
 	if numConns != numNodes {
-		fmt.Fprintf(os.Stderr, "numConns: %d, numNodes: %d", numConns, numNodes)
+		fmt.Fprintf("numConns: %d, numNodes: %d", numConns, numNodes)
 	}
 }
 
@@ -187,7 +187,7 @@ func handleMessageChannel() {
 			if m.OriginalSender != localNodeNum {
 				panic("PANIC m.OriginalSender != localNodeNum")
 			}
-			fmt.Println(os.Stderr, "Step 1: Local Event: ", m)
+			fmt.Println("Step 1: Local Event: ", m)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
@@ -205,13 +205,13 @@ func handleMessageChannel() {
 
 		// DEBUG
 		if m.OriginalSender == localNodeNum {
-			fmt.Println(os.Stderr, m)
+			fmt.Println(m)
 			panic("PANIC  m.OriginalSender == localNodeNum")
 		}
 
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
-			fmt.Println(os.Stderr, "Step 2: Proposal Received Event:"+m.Transaction)
+			fmt.Println("Step 2: Proposal Received Event:" + m.Transaction)
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
@@ -231,13 +231,13 @@ func handleMessageChannel() {
 				m.Transaction = pq[idx].value.Transaction
 				m.SequenceNumber = pq[idx].priority
 				rMulticast(m)
-				fmt.Println(os.Stderr, "rMulticasted Final Sequence : ", m)
+				fmt.Println("rMulticasted Final Sequence : ", m)
 				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(&pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
-			fmt.Println(os.Stderr, "External Event Received : ", m)
+			fmt.Println("External Event Received : ", m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
@@ -248,10 +248,10 @@ func handleMessageChannel() {
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.SequenceNumber = maxProposedSeqNum
 			nodeList[prevSender].unicast(m)
-			fmt.Println(os.Stderr, "Sent Proposal : ", m)
+			fmt.Println("Sent Proposal : ", m)
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			fmt.Println(os.Stderr, "AGREED ON PRIORITY: ", m.Transaction)
+			fmt.Println("AGREED ON PRIORITY: ", m.Transaction)
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
 				panic("FIND RETURNED MAX INDEX")
@@ -263,7 +263,7 @@ func handleMessageChannel() {
 			deliverAgreedTransactions(&pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
 		} else {
-			fmt.Println(os.Stderr, "NO CONDITION SATISFIED, m: ", m)
+			fmt.Println("NO CONDITION SATISFIED, m: ", m)
 		}
 	}
 }
@@ -284,10 +284,10 @@ func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
-		fmt.Println(os.Stderr, "Delivering Transaction")
+		fmt.Println("Delivering Transaction")
 		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Println(os.Stderr, "Transaction: ", result.value.Transaction, "SequenceNumber: ", result.value.SequenceNumber, "commitNum: ", commitNum)
+		fmt.Println("Transaction: ", result.value.Transaction, "SequenceNumber: ", result.value.SequenceNumber, "commitNum: ", commitNum)
 		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
@@ -310,7 +310,7 @@ func allResponsesReceived(responsesReceived []bool) bool {
 func main() {
 	arguments := os.Args
 	if len(arguments) != 4 {
-		fmt.Fprintln(os.Stderr, "Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
+		fmt.Fprintln("Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
 		return
 	}
 	commitNum = 0
