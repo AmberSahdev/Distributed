@@ -209,8 +209,7 @@ func handleMessageChannel() {
 
 		// DEBUG
 		if m.OriginalSender == localNodeNum {
-			fmt.Println(m)
-			panic("PANIC  m.OriginalSender == localNodeNum")
+			panic("PANIC  m.OriginalSender == localNodeNum", m)
 		}
 
 		// delivery of Message to ISIS handler occurs here
