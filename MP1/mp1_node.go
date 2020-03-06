@@ -210,6 +210,7 @@ func handleMessageChannel() {
 		// DEBUG
 		if m.OriginalSender == localNodeNum {
 			fmt.Println(m)
+			fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
 			panic("PANIC  m.OriginalSender == localNodeNum")
 		}
 
