@@ -241,7 +241,7 @@ func handleMessageChannel() {
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(&pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
-			fmt.Println("External Event Received:", m)
+			fmt.Println("Received Message 1 :", m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
@@ -252,7 +252,7 @@ func handleMessageChannel() {
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.SequenceNumber = maxProposedSeqNum
 			nodeList[prevSender].unicast(m)
-			fmt.Println("Sent Proposal:", m)
+			fmt.Println("Sent Proposal Message 2:", m)
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
 			fmt.Println("Receiving Message 3 Agreed on Priority:", m)
