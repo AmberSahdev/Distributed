@@ -29,7 +29,7 @@ func (destNode *nodeComms) communicationTask() {
 	// fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
 		err := tcpEnc.Encode(m)
-		fmt.Println("ENCODE m IN communicationTask:", m)
+		// fmt.Println("ENCODE m IN communicationTask:", m)
 		if err != nil {
 			fmt.Println("Failed to send Message, receiver down?")
 			return
@@ -85,7 +85,7 @@ func receiveIncomingData(conn net.Conn) {
 		defer nodeList[incomingNodeNum].closeOutgoingConn()
 		err = tcpDecode.Decode(new_m)
 		for err == nil {
-			fmt.Println("DECODE m IN receiveIncomingData:", new_m)
+			// fmt.Println("DECODE m IN receiveIncomingData:", new_m)
 			localReceivingChannel <- *new_m
 			new_m = new(Message)
 			err = tcpDecode.Decode(new_m)
@@ -93,8 +93,7 @@ func receiveIncomingData(conn net.Conn) {
 	}
 	now := time.Now()
 	nanoseconds := float64(now.UnixNano()) / 1e9
-	fmt.Println(err)
-	fmt.Printf("%f - Node %d disconnected\n", nanoseconds, incomingNodeNum)
+	fmt.Printf("%f - Node %d disconnected, %v\n", nanoseconds, incomingNodeNum, err)
 }
 
 func handleAllIncomingConns(listener net.Listener) {
@@ -105,6 +104,7 @@ func handleAllIncomingConns(listener net.Listener) {
 		conn, err = listener.Accept()
 		go receiveIncomingData(conn) // open up a go routine
 	}
+	// TODO consider replacing this with panic
 	fmt.Println("ERROR receiving incoming connections")
 }
 
@@ -139,6 +139,8 @@ func handleLocalEventGenerator() {
 func waitForAllNodesSync() {
 	time.Sleep(5 * time.Second)
 	if numConns != numNodes {
+		// TODO potentially insert a panic here
+		fmt.Println("Failed to establish all expected connections")
 		fmt.Println("numConns: %d, numNodes: %d", numConns, numNodes)
 	}
 }
@@ -189,7 +191,7 @@ func handleMessageChannel() {
 	for incomingMessage := range localReceivingChannel {
 		m_ptr := new(Message)
 		*m_ptr = incomingMessage
-		fmt.Println("MESSAGE RECEIVED", m_ptr)
+		// fmt.Println("MESSAGE RECEIVED", m_ptr)
 		if m_ptr.isAlreadyReceived() {
 			continue
 		}
@@ -205,7 +207,7 @@ func handleMessageChannel() {
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
-			fmt.Println("Step 1: Local event:", m_ptr)
+			// fmt.Println("Step 1: Local event:", m_ptr)
 			bMulticast(*m_ptr)
 			continue
 
@@ -241,7 +243,7 @@ func handleMessageChannel() {
 				m_ptr.Transaction = pq[idx].value.Transaction
 				m_ptr.SequenceNumber = pq[idx].priority
 				rMulticast(*m_ptr)
-				fmt.Println("Step 3: rMulticasted Final Sequence : ", m_ptr)
+				// fmt.Println("Step 3: rMulticasted Final Sequence : ", m_ptr)
 				maxFinalSeqNum = max(m_ptr.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
@@ -255,16 +257,16 @@ func handleMessageChannel() {
 			m_ptr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m_ptr.SequenceNumber = maxProposedSeqNum
 			nodeList[prevSender].unicast(*m_ptr)
-			fmt.Println("Sent Proposal Message 2:", m_ptr)
+			// fmt.Println("Sent Proposal Message 2:", m_ptr)
 		} else if m_ptr.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			fmt.Println("Receiving Message 3, Agreed on Priority:", m_ptr)
+			// fmt.Println("Receiving Message 3, Agreed on Priority:", m_ptr)
 			idx := pq.find(m_ptr.TransactionId)
 			if idx == math.MaxInt32 {
 				panic("FIND RETURNED MAX INDEX 2")
 			}
 			pq[idx].priority = m_ptr.SequenceNumber // update priority in pq = final priority
-			pq[idx].value = *m_ptr                   // copy the Message with the contents
+			pq[idx].value = *m_ptr                  // copy the Message with the contents
 			heap.Fix(&pq, idx)
 
 			deliverAgreedTransactions(&pq)
@@ -294,7 +296,7 @@ func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	for m.IsFinal {
 		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Println("Delivering Transaction Message:", result.value, "commitNum:", commitNum)
+		fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
 		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
