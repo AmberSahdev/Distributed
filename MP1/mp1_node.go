@@ -132,7 +132,7 @@ func handleLocalEventGenerator() {
 func waitForAllNodesSync() {
 	time.Sleep(5 * time.Second)
 	if numConns != numNodes {
-		fmt.Fprintf("numConns: %d, numNodes: %d", numConns, numNodes)
+		fmt.Println("numConns: %d, numNodes: %d", numConns, numNodes)
 	}
 }
 
