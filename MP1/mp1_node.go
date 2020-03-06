@@ -244,7 +244,7 @@ func handleMessageChannel() {
 
 			deliverAgreedTransactions(pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
-		} else {
+		} else if m.SenderMessageNumber > 0 {
 			fmt.Print("Wot, ")
 			fmt.Println(m)
 		}
