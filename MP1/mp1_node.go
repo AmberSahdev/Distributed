@@ -223,7 +223,7 @@ func handleMessageChannel() {
 			}
 			// update priority in pq = max(proposed priority, local priority)
 			pq[idx].priority = max(m.SequenceNumber, pq[idx].priority)
-
+			pq[idx].value.SequenceNumber = pq[idx].priority
 			pq[idx].responsesReceived[m.OriginalSender] = true
 
 			if allResponsesReceived(pq[idx].responsesReceived) {
