@@ -1,8 +1,6 @@
 package main
 
 import (
-	"container/heap"
-	"fmt"
 	"math"
 )
 
@@ -16,12 +14,12 @@ type Item struct {
 }
 
 func NewItem(m Message, priorityNum int64) *Item {
-	return &Item{
-		value:             m,
-		priority:          priorityNum,
-		index:             -1,
-		responsesReceived: make([]bool, numNodes),
-	}
+	var item = new(Item)
+	item.value = m
+	item.priority = priorityNum
+	item.index = -1
+	item.responsesReceived = make([]bool, numNodes)
+	return item
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.
@@ -39,7 +37,7 @@ func (pq PriorityQueue) find(transactionId uint64) int {
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
+	// We want Pop to give us the smallest number, not highest, priority so we use less than here.
 	return pq[i].priority < pq[j].priority
 }
 
@@ -66,26 +64,17 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
+/*
 func test_heap() {
 	// Some items and their priorities.
-	numNodes = 10
 	var test_m Message
 	pq := make(PriorityQueue, 0)
-
-	item1 := NewItem(test_m, 5)
-	heap.Push(&pq, &item1)
-
-	item2 := NewItem(test_m, 7)
-	heap.Push(&pq, &item2)
-
-	item3 := NewItem(test_m, 2)
-	heap.Push(&pq, &item3)
-
-	item4 := NewItem(test_m, 9)
-	heap.Push(&pq, &item4)
-
-	fmt.Println(heap.Pop(&pq).(*Item).priority)
-	fmt.Println(heap.Pop(&pq).(*Item).priority)
-	fmt.Println(heap.Pop(&pq).(*Item).priority)
-	fmt.Println(heap.Pop(&pq).(*Item).priority)
+	var i int64
+	for i=0;i<10;i--{
+		heap.Push(&pq, NewItem(test_m, 10-i))
+	}
+	for i=0;i<10;i-- {
+		fmt.Println(heap.Pop(&pq).(*Item).priority)
+	}
 }
+*/

@@ -215,7 +215,9 @@ func handleMessageChannel() {
 			fmt.Println("Proposal received Event: " + m.Transaction)
 
 			idx := pq.find(m.TransactionId)
-
+			if idx == math.MaxInt32 {
+				panic("FU AMBER")
+			}
 			// update priority in pq = max(proposed priority, local priority)
 			pq[idx].priority = max(m.SequenceNumber, pq[idx].priority)
 
@@ -228,12 +230,12 @@ func handleMessageChannel() {
 				nodeList[localNodeNum].senderMessageNum += 1
 				m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 				m.Transaction = pq[idx].value.Transaction
-				m.SequenceNumber = int64(pq[idx].priority)
+				m.SequenceNumber = pq[idx].priority
 				rMulticast(m)
 				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
-			deliverAgreedTransactions(pq)
+			deliverAgreedTransactions(&pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
 			fmt.Print("initial received Event: ")
 			fmt.Println(m)
@@ -253,11 +255,14 @@ func handleMessageChannel() {
 			// reorder based on final priority
 			fmt.Println("Final received Event: " + m.Transaction)
 			idx := pq.find(m.TransactionId)
+			if idx == math.MaxInt32 {
+				panic("FU AMBER")
+			}
 			pq[idx].priority = m.SequenceNumber // update priority in pq = final priority
 			pq[idx].value = m                   // copy the Message with the contents
 			heap.Fix(&pq, idx)
 
-			deliverAgreedTransactions(pq)
+			deliverAgreedTransactions(&pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
 		} else {
 			fmt.Print("Wot, ")
@@ -274,16 +279,18 @@ func findProposalNumber(maxProposedSeqNum int64, maxFinalSeqNum int64) int64 {
 	return maxProposedSeqNum + 1
 }
 
-func deliverAgreedTransactions(pq PriorityQueue) {
+func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	// commit agreed transactions to account
+	pq := *pq_ptr
 	if len(pq) == 0 {
 		return
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
-		result := heap.Pop(&pq).(*Item) // TODO: put it into our account balances
+		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
 		fmt.Printf("%d %d "+result.value.Transaction, result.value.SequenceNumber, commitNum)
+		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
 		}
