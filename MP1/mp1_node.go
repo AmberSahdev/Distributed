@@ -201,7 +201,7 @@ func handleMessageChannel() {
 			bMulticast(m)
 			continue
 		} else { // Handling event received from a different node
-			nodeList[m.OriginalSender].senderMessageNum = m.SequenceNumber
+			nodeList[m.OriginalSender].senderMessageNum = m.SenderMessageNumber
 			if m.IsRMulticast {
 				rMulticast(m)
 			}
