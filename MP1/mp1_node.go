@@ -72,17 +72,21 @@ func parseHostTextfile(path string) []string {
 
 func receiveIncomingData(conn net.Conn) {
 	var m Message
+	var incomingNodeNum uint8 = math.MaxUint8
 	tcpDecode := gob.NewDecoder(conn)
 	err := tcpDecode.Decode(&m)
-	incomingNodeNum := m.OriginalSender
-	if !nodeList[incomingNodeNum].isConnected {
-		// set up a new connection
-		nodeList[incomingNodeNum].openOutgoingConn()
-	}
-	defer nodeList[incomingNodeNum].closeOutgoingConn()
-	for err == nil {
-		localReceivingChannel <- m
+	if err == nil {
+		incomingNodeNum = m.OriginalSender
+		if !nodeList[incomingNodeNum].isConnected {
+			// set up a new connection
+			nodeList[incomingNodeNum].openOutgoingConn()
+		}
+		defer nodeList[incomingNodeNum].closeOutgoingConn()
 		err = tcpDecode.Decode(&m)
+		for err == nil {
+			localReceivingChannel <- m
+			err = tcpDecode.Decode(&m)
+		}
 	}
 	now := time.Now()
 	nanoseconds := float64(now.UnixNano()) / 1e9
