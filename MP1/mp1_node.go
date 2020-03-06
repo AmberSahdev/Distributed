@@ -39,7 +39,7 @@ func (destNode *nodeComms) communicationTask() {
 
 func (destNode *nodeComms) openOutgoingConn() {
 	var err error
-	destNode.conn, err = net.Dial("tcp", (destNode.address)+":"+(destNode.port))
+	destNode.conn, err = net.Dial("tcp", destNode.address)
 	if err == nil {
 		destNode.isConnected = true
 		numConns++
@@ -136,13 +136,12 @@ func waitForAllNodesSync() {
 	}
 }
 
-func setupConnections(port string, hostList []string) {
+func setupConnections(hostList []string) {
 	var curNodeNum uint8
 	nodeList = make([]nodeComms, numNodes)
 	listener := openListener(port)
 	go handleAllIncomingConns(listener)
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
-		nodeList[curNodeNum].port = port
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 		if localNodeNum == curNodeNum {
 			nodeList[curNodeNum].conn = nil
@@ -244,7 +243,7 @@ func handleMessageChannel() {
 
 			deliverAgreedTransactions(pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
-		} else if m.SenderMessageNumber > 0 {
+		} else {
 			fmt.Print("Wot, ")
 			fmt.Println(m)
 		}
@@ -284,21 +283,20 @@ func allResponsesReceived(responsesReceived []bool) bool {
 func main() {
 	arguments := os.Args
 	if len(arguments) != 4 {
-		fmt.Fprintln(os.Stderr, "Expected Format: ./node [number of nodes] [port of centralized logging server]")
+		fmt.Fprintln(os.Stderr, "Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
 		return
 	}
 	commitNum = 0
 	numConns = 1
 	newNumNodes, err := strconv.Atoi(arguments[1])
 	check(err)
-	hostList := parseHostTextfile("../hosts.txt")
-	agreedPort := arguments[2]
+	hostList := parseHostTextfile(arguments[2])
 	newNodeNum, err := strconv.Atoi(arguments[3])
 	check(err)
 	numNodes = uint8(newNumNodes)
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
-	setupConnections(agreedPort, hostList)
+	setupConnections(hostList)
 	go handleLocalEventGenerator()
 	handleMessageChannel()
 }

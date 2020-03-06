@@ -4,8 +4,7 @@ import "net"
 
 type nodeComms struct {
 	senderMessageNum int64    //
-	port             string   // outgoing node's port
-	address          string   // outgoing node's address
+	address          string   // outgoing node's address:port string
 	conn             net.Conn // TODO find out if pass by value or pointer is better here
 	outbox           chan Message
 	isConnected      bool
