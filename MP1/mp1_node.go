@@ -219,7 +219,7 @@ func handleMessageChannel() {
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
-				panic("FIND RETURNED MAX INDEX")
+				panic("FIND RETURNED MAX INDEX 1")
 			}
 			// update priority in pq = max(proposed priority, local priority)
 			pq[idx].priority = max(m.SequenceNumber, pq[idx].priority)
@@ -258,7 +258,7 @@ func handleMessageChannel() {
 			fmt.Println("Receiving Message 3 Agreed on Priority:", m.Transaction)
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
-				panic("FIND RETURNED MAX INDEX")
+				panic("FIND RETURNED MAX INDEX 2")
 			}
 			pq[idx].priority = m.SequenceNumber // update priority in pq = final priority
 			pq[idx].value = m                   // copy the Message with the contents
