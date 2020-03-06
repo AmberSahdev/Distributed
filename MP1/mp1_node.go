@@ -187,15 +187,13 @@ func handleMessageChannel() {
 		}
 		if m.SenderMessageNumber < 0 { // Handling of a local event
 			if m.OriginalSender != localNodeNum {
-				panic("HECK")
+				panic("PANIC m.OriginalSender != localNodeNum")
 			}
-			fmt.Print("Local Event: ")
-			fmt.Println(m)
+			fmt.Println(os.Stderr, "Step 1: Local Event: ", m)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-			fmt.Println(len(pq))
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 			m.setTransactionId()
 			bMulticast(m)
@@ -206,17 +204,20 @@ func handleMessageChannel() {
 				rMulticast(m)
 			}
 		}
+
+		// DEBUG
 		if m.OriginalSender == localNodeNum {
-			fmt.Println(m)
-			panic("HOLY")
+			fmt.Println(os.Stderr, m)
+			panic("PANIC  m.OriginalSender == localNodeNum")
 		}
+
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
-			fmt.Println("Proposal received Event: " + m.Transaction)
+			fmt.Println(os.Stderr, "Step 2: Proposal Received Event:" + m.Transaction)
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
-				panic("FU AMBER")
+				panic("FIND RETURNED MAX INDEX")
 			}
 			// update priority in pq = max(proposed priority, local priority)
 			pq[idx].priority = max(m.SequenceNumber, pq[idx].priority)
@@ -232,13 +233,13 @@ func handleMessageChannel() {
 				m.Transaction = pq[idx].value.Transaction
 				m.SequenceNumber = pq[idx].priority
 				rMulticast(m)
+				fmt.Println(os.Stderr, "rMulticasted Final Sequence : ", m)
 				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(&pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
-			fmt.Print("initial received Event: ")
-			fmt.Println(m)
+			fmt.Println(os.Stderr, "External Event Received : ", m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 			fmt.Println(len(pq))
@@ -250,13 +251,13 @@ func handleMessageChannel() {
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.SequenceNumber = maxProposedSeqNum
 			nodeList[prevSender].unicast(m)
-
+			fmt.Println(os.Stderr, "Sent Proposal : ", m)
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			fmt.Println("Final received Event: " + m.Transaction)
+			fmt.Println(os.Stderr, "AGREED ON PRIORITY: ", m.Transaction)
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
-				panic("FU AMBER")
+				panic("FIND RETURNED MAX INDEX")
 			}
 			pq[idx].priority = m.SequenceNumber // update priority in pq = final priority
 			pq[idx].value = m                   // copy the Message with the contents
@@ -265,8 +266,7 @@ func handleMessageChannel() {
 			deliverAgreedTransactions(&pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
 		} else {
-			fmt.Print("Wot, ")
-			fmt.Println(m)
+			fmt.Println(os.Stderr, "NO CONDITION SATISFIED, m: ", m)
 		}
 	}
 }
@@ -287,9 +287,10 @@ func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
+		fmt.Println(os.Stderr, "Delivering Transaction")
 		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Printf("%d %d "+result.value.Transaction, result.value.SequenceNumber, commitNum)
+		fmt.Println(os.Stderr, "Transaction: ", result.value.Transaction, "SequenceNumber: ", result.value.SequenceNumber, "commitNum: ", commitNum)
 		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
@@ -326,6 +327,7 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
 	setupConnections(hostList)
+	fmt.Println("Enter")
 	go handleLocalEventGenerator()
 	handleMessageChannel()
 }
