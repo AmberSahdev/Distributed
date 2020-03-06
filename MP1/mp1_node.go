@@ -197,6 +197,7 @@ func handleMessageChannel() {
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
+			fmt.Println("Step 1: Local event:", m)
 			bMulticast(m)
 			continue
 		} else { // Handling event received from a different node
@@ -214,7 +215,7 @@ func handleMessageChannel() {
 
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
-			fmt.Println("Step 2: Proposal Received Event: ", m)
+			fmt.Println("Step 2: Proposal Received Event:", m)
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
