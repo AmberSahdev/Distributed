@@ -75,7 +75,7 @@ func receiveIncomingData(conn net.Conn) {
 	var incomingNodeNum uint8 = math.MaxUint8
 	tcpDecode := gob.NewDecoder(conn)
 	err := tcpDecode.Decode(&m)
-	if err != nil {
+	if err == nil {
 		incomingNodeNum = m.OriginalSender
 		if !nodeList[incomingNodeNum].isConnected {
 			// set up a new connection
