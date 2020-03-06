@@ -191,7 +191,6 @@ func handleMessageChannel() {
 			if m.OriginalSender != localNodeNum {
 				panic("PANIC m.OriginalSender != localNodeNum")
 			}
-			fmt.Println("Step 1: Local Event: ", m)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.setTransactionId()
@@ -215,7 +214,7 @@ func handleMessageChannel() {
 
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
-			fmt.Println("Step 2: Proposal Received Event:" + m.Transaction)
+			fmt.Println("Step 2: Proposal Received Event: ", m)
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
