@@ -201,19 +201,16 @@ func handleMessageChannel() {
 			bMulticast(m)
 			continue
 		} else { // Handling event received from a different node
+			if m.OriginalSender == localNodeNum {
+				fmt.Println(m)
+				fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
+				panic("PANIC  m.OriginalSender == localNodeNum")
+			}
 			nodeList[m.OriginalSender].senderMessageNum = m.SenderMessageNumber
 			if m.IsRMulticast {
 				rMulticast(m)
 			}
 		}
-
-		// DEBUG
-		if m.OriginalSender == localNodeNum {
-			fmt.Println(m)
-			fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
-			panic("PANIC  m.OriginalSender == localNodeNum")
-		}
-
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
 			fmt.Println("Step 2: Proposal Received Event:", m)
