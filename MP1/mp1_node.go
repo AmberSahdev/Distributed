@@ -24,11 +24,17 @@ var localReceivingChannel chan Message
 func (destNode *nodeComms) communicationTask() {
 	// fmt.Println("preparing To Receive m's")
 	tcpEnc := gob.NewEncoder(destNode.conn)
+
+	tcpDecode := gob.NewDecoder(destNode.conn)
+
 	defer destNode.conn.Close()
 	// fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
 		fmt.Println("ENCODE m IN communicationTask:", m)
-		err := tcpEnc.Encode(m)
+		err := tcpDecode.Decode(&m)
+		fmt.Println("TEST DECODE m IN communicationTask:", m)
+
+		err = tcpEnc.Encode(m)
 		// fmt.Println("sent m")
 		if err != nil {
 			fmt.Println("Failed to send Message, receiver down?")
