@@ -103,8 +103,9 @@ func handleAllIncomingConns(listener net.Listener) {
 	fmt.Println("ERROR receiving incoming connections")
 }
 
-func openListener(port string) net.Listener {
-	listener, err := net.Listen("tcp", ":"+port) // open port
+func openListener() net.Listener {
+	localPort := strings.Split(nodeList[localNodeNum].address, ":")[1]
+	listener, err := net.Listen("tcp", ":"+localPort) // open port
 	check(err)
 	return listener
 }
@@ -121,7 +122,8 @@ func handleLocalEventGenerator() {
 			SequenceNumber:      -1,
 			TransactionId:       math.MaxUint64,
 			IsFinal:             false,
-			IsRMulticast:        false}
+			IsRMulticast:        false,
+		}
 
 		localReceivingChannel <- m
 	}
@@ -130,7 +132,7 @@ func handleLocalEventGenerator() {
 
 // TODO figure out how to block until everyone is connected
 func waitForAllNodesSync() {
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 	if numConns != numNodes {
 		fmt.Fprintf(os.Stderr, "numConns: %d, numNodes: %d", numConns, numNodes)
 	}
@@ -139,10 +141,12 @@ func waitForAllNodesSync() {
 func setupConnections(hostList []string) {
 	var curNodeNum uint8
 	nodeList = make([]nodeComms, numNodes)
-	listener := openListener(port)
-	go handleAllIncomingConns(listener)
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
+	}
+	listener := openListener()
+	go handleAllIncomingConns(listener)
+	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		if localNodeNum == curNodeNum {
 			nodeList[curNodeNum].conn = nil
 			nodeList[curNodeNum].outbox = localReceivingChannel
@@ -155,7 +159,7 @@ func setupConnections(hostList []string) {
 }
 
 func (m *Message) isAlreadyReceived() bool {
-	return (m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber) || nodeList[m.OriginalSender].senderMessageNum <= 0
+	return m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber
 }
 
 func (m *Message) isProposal() bool {
@@ -182,6 +186,9 @@ func handleMessageChannel() {
 			continue
 		}
 		if m.SenderMessageNumber < 0 { // Handling of a local event
+			if m.OriginalSender != localNodeNum {
+				panic("HECK")
+			}
 			fmt.Println("Local Event: " + m.Transaction)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
@@ -192,11 +199,15 @@ func handleMessageChannel() {
 			heap.Push(&pq, &item)
 			m.setTransactionId()
 			bMulticast(m)
+			continue
 		} else { // Handling event received from a different node
 			nodeList[m.OriginalSender].senderMessageNum = m.SequenceNumber
 			if m.IsRMulticast {
 				rMulticast(m)
 			}
+		}
+		if m.OriginalSender == localNodeNum {
+			panic("HOLY")
 		}
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
@@ -231,6 +242,9 @@ func handleMessageChannel() {
 			heap.Push(&pq, &item)
 
 			m.OriginalSender = localNodeNum
+			nodeList[localNodeNum].senderMessageNum += 1
+			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
+			m.SequenceNumber = maxProposedSeqNum
 			nodeList[m.OriginalSender].unicast(m)
 
 		} else if m.IsFinal { // Receiving Message 3 here
