@@ -189,7 +189,8 @@ func handleMessageChannel() {
 			if m.OriginalSender != localNodeNum {
 				panic("HECK")
 			}
-			fmt.Println("Local Event: " + m.Transaction)
+			fmt.Print("Local Event: ")
+			fmt.Println(m)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
@@ -207,6 +208,7 @@ func handleMessageChannel() {
 			}
 		}
 		if m.OriginalSender == localNodeNum {
+			fmt.Println(m)
 			panic("HOLY")
 		}
 		// delivery of Message to ISIS handler occurs here
@@ -234,18 +236,20 @@ func handleMessageChannel() {
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
-			fmt.Println("initial received Event: " + m.Transaction)
+			fmt.Print("initial received Event: ")
+			fmt.Println(m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			item := NewItem(m, maxProposedSeqNum)
 			heap.Push(&pq, &item)
 
+			prevSender := m.OriginalSender
 			m.OriginalSender = localNodeNum
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.SequenceNumber = maxProposedSeqNum
-			nodeList[m.OriginalSender].unicast(m)
+			nodeList[prevSender].unicast(m)
 
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
