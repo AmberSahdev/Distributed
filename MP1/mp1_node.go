@@ -235,13 +235,13 @@ func handleMessageChannel() {
 				m.Transaction = pq[idx].value.Transaction
 				m.SequenceNumber = pq[idx].priority
 				rMulticast(m)
-				fmt.Println("rMulticasted Final Sequence : ", m)
+				fmt.Println("Step 3: rMulticasted Final Sequence : ", m)
 				maxFinalSeqNum = max(m.SequenceNumber, maxFinalSeqNum)
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(&pq)
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
-			fmt.Println("External Event Received : ", m)
+			fmt.Println("External Event Received:", m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
@@ -252,10 +252,10 @@ func handleMessageChannel() {
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.SequenceNumber = maxProposedSeqNum
 			nodeList[prevSender].unicast(m)
-			fmt.Println("Sent Proposal : ", m)
+			fmt.Println("Sent Proposal:", m)
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
-			fmt.Println("AGREED ON PRIORITY: ", m.Transaction)
+			fmt.Println("AGREED ON PRIORITY:", m.Transaction)
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
 				panic("FIND RETURNED MAX INDEX")
@@ -267,7 +267,7 @@ func handleMessageChannel() {
 			deliverAgreedTransactions(&pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
 		} else {
-			fmt.Println("NO CONDITION SATISFIED, m: ", m)
+			fmt.Println("NO CONDITION SATISFIED, m:", m)
 		}
 	}
 }
