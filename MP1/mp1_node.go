@@ -288,10 +288,9 @@ func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
-		fmt.Println("Delivering Transaction")
 		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
 		commitNum++
-		fmt.Println("Transaction: ", result.value.Transaction, "SequenceNumber: ", result.value.SequenceNumber, "commitNum: ", commitNum)
+		fmt.Println("Delivering Transaction:", result.value.Transaction, "SequenceNumber:", result.value.SequenceNumber, "commitNum:", commitNum)
 		pq := *pq_ptr
 		if len(pq) == 0 {
 			return
