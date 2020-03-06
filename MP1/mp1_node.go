@@ -112,7 +112,6 @@ func handleLocalEventGenerator() {
 	// read stuff from stdin infinitely
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		fmt.Println("New Event Generated")
 		text := scanner.Text()
 		m := Message{
 			OriginalSender:      localNodeNum,
@@ -325,7 +324,6 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
 	setupConnections(hostList)
-	fmt.Println("Enter")
 	go handleLocalEventGenerator()
 	handleMessageChannel()
 }
