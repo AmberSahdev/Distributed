@@ -194,10 +194,10 @@ func handleMessageChannel() {
 			fmt.Println("Step 1: Local Event: ", m)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
-
-			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 			m.setTransactionId()
+			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
+
+			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 			bMulticast(m)
 			continue
 		} else { // Handling event received from a different node
