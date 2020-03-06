@@ -73,10 +73,8 @@ func parseHostTextfile(path string) []string {
 func receiveIncomingData(conn net.Conn) {
 	var m Message
 	tcpDecode := gob.NewDecoder(conn)
-	// fmt.Println("Ready To Receive Data")
 	err := tcpDecode.Decode(&m)
 	incomingNodeNum := m.OriginalSender
-	// fmt.Println("Fuck Me")
 	if !nodeList[incomingNodeNum].isConnected {
 		// set up a new connection
 		nodeList[incomingNodeNum].openOutgoingConn()
@@ -213,7 +211,7 @@ func handleMessageChannel() {
 
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
-			fmt.Println(os.Stderr, "Step 2: Proposal Received Event:" + m.Transaction)
+			fmt.Println(os.Stderr, "Step 2: Proposal Received Event:"+m.Transaction)
 
 			idx := pq.find(m.TransactionId)
 			if idx == math.MaxInt32 {
@@ -242,7 +240,6 @@ func handleMessageChannel() {
 			fmt.Println(os.Stderr, "External Event Received : ", m)
 
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-			fmt.Println(len(pq))
 			heap.Push(&pq, NewItem(m, maxProposedSeqNum))
 
 			prevSender := m.OriginalSender
