@@ -188,9 +188,11 @@ func handleMessageChannel() {
 			continue
 		}
 		if m.SenderMessageNumber < 0 { // Handling of a local event
+
 			if m.OriginalSender != localNodeNum {
-				panic("PANIC m.OriginalSender != localNodeNum")
+				panic("PANIC m.OriginalSender != localNodeNum 1")
 			}
+
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 			m.setTransactionId()
@@ -200,12 +202,14 @@ func handleMessageChannel() {
 			fmt.Println("Step 1: Local event:", m)
 			bMulticast(m)
 			continue
+
 		} else { // Handling event received from a different node
 			if m.OriginalSender == localNodeNum {
 				fmt.Println(m)
 				fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
-				panic("PANIC  m.OriginalSender == localNodeNum")
+				panic("PANIC  m.OriginalSender == localNodeNum, we should've filtered this out")
 			}
+
 			nodeList[m.OriginalSender].senderMessageNum = m.SenderMessageNumber
 			if m.IsRMulticast {
 				rMulticast(m)
