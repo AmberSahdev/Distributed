@@ -156,7 +156,7 @@ func setupConnections(port string, hostList []string) {
 }
 
 func (m *Message) isAlreadyReceived() bool {
-	return m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber
+	return (m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber) || nodeList[m.OriginalSender].senderMessageNum <= 0
 }
 
 func (m *Message) isProposal() bool {
@@ -183,6 +183,7 @@ func handleMessageChannel() {
 			continue
 		}
 		if m.SenderMessageNumber < 0 { // Handling of a local event
+			fmt.Println("Local Event: " + m.Transaction)
 			nodeList[localNodeNum].senderMessageNum += 1
 			m.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 
@@ -200,6 +201,8 @@ func handleMessageChannel() {
 		}
 		// delivery of Message to ISIS handler occurs here
 		if m.isProposal() { // Receiving Message 2 and sending Message 3 handled here
+			fmt.Println("Proposal received Event: " + m.Transaction)
+
 			idx := pq.find(m.TransactionId)
 
 			// update priority in pq = max(proposed priority, local priority)
@@ -220,8 +223,9 @@ func handleMessageChannel() {
 			}
 			heap.Fix(&pq, idx)
 			deliverAgreedTransactions(pq)
-
 		} else if m.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
+			fmt.Println("initial received Event: " + m.Transaction)
+
 			maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 			item := NewItem(m, maxProposedSeqNum)
@@ -232,6 +236,7 @@ func handleMessageChannel() {
 
 		} else if m.IsFinal { // Receiving Message 3 here
 			// reorder based on final priority
+			fmt.Println("Final received Event: " + m.Transaction)
 			idx := pq.find(m.TransactionId)
 			pq[idx].priority = m.SequenceNumber // update priority in pq = final priority
 			pq[idx].value = m                   // copy the Message with the contents
@@ -239,6 +244,9 @@ func handleMessageChannel() {
 
 			deliverAgreedTransactions(pq)
 			maxFinalSeqNum = max(maxFinalSeqNum, m.SequenceNumber)
+		} else {
+			fmt.Print("Wot, ")
+			fmt.Println(m)
 		}
 	}
 }
