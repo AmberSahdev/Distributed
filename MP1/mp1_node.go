@@ -27,7 +27,7 @@ func (destNode *nodeComms) communicationTask() {
 	defer destNode.conn.Close()
 	// fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
-		fmt.Println("THIS IS m IN communicationTask:", m)
+		fmt.Println("ENCODE m IN communicationTask:", m)
 		err := tcpEnc.Encode(m)
 		// fmt.Println("sent m")
 		if err != nil {
@@ -84,6 +84,7 @@ func receiveIncomingData(conn net.Conn) {
 		defer nodeList[incomingNodeNum].closeOutgoingConn()
 		err = tcpDecode.Decode(&m)
 		for err == nil {
+			fmt.Println("DECODE m IN receiveIncomingData:", m)
 			localReceivingChannel <- m
 			err = tcpDecode.Decode(&m)
 		}
