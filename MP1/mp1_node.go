@@ -310,7 +310,7 @@ func allResponsesReceived(responsesReceived []bool) bool {
 func main() {
 	arguments := os.Args
 	if len(arguments) != 4 {
-		fmt.Fprintln("Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
+		fmt.Println("Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
 		return
 	}
 	commitNum = 0
