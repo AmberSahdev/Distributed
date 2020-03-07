@@ -7,12 +7,12 @@ func check(e error) {
 	}
 }
 
-func (destNode nodeComms) unicast(m Message) {
+func (destNode *nodeComms) unicast(m BankMessage) {
 	destNode.outbox <- m
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
-func bMulticast(m Message) {
+func bMulticast(m BankMessage) {
 	var i uint8
 	for i = 0; i < numNodes; i++ {
 		if nodeList[i].isConnected && i != localNodeNum {
@@ -22,7 +22,7 @@ func bMulticast(m Message) {
 }
 
 // Pushes outgoing data to all channels so that our outgoing networking threads can push it out to other nodes
-func rMulticast(m Message) {
+func rMulticast(m BankMessage) {
 	m.IsRMulticast = true
 	bMulticast(m)
 }

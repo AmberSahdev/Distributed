@@ -7,13 +7,13 @@ import (
 // Derived from  https://golang.org/pkg/container/heap/
 // An Item is something we manage in a priority queue.
 type Item struct {
-	value             Message // The value of the item; arbitrary.
-	priority          int64   // The priority of the item in the queue. Corresponds to largest sequence number proposed so far
-	index             int     // The index of the item in the heap. The index is needed by update and is maintained by the heap.Interface methods.
-	responsesReceived []bool  // 1 means reply received from node, 0 means Message not received
+	value             BankMessage // The value of the item; arbitrary.
+	priority          int64       // The priority of the item in the queue. Corresponds to largest sequence number proposed so far
+	index             int         // The index of the item in the heap. The index is needed by update and is maintained by the heap.Interface methods.
+	responsesReceived []bool      // 1 means reply received from node, 0 means Message not received
 }
 
-func NewItem(m Message, priorityNum int64) *Item {
+func NewItem(m BankMessage, priorityNum int64) *Item {
 	var item = new(Item)
 	item.value = m
 	item.priority = priorityNum
