@@ -181,6 +181,9 @@ func (m *BankMessage) setTransactionId() {
 func removeDeadHead(pqPtr *PriorityQueue) {
 	fmt.Println("IN removeDeadHead")
 	pq := *pqPtr
+	if len(pq) == 0 {
+		return
+	}
 	headNodeNum := pq[0].value.TransactionId >> 56
 	fmt.Println("headNodeNum:", headNodeNum)
 	for !nodeList[headNodeNum].isConnected {
