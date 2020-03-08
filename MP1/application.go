@@ -17,7 +17,6 @@ func update_balances(m BankMessage) {
 		balances[account1] -= amount
 		balances[account2] += amount
 	}
-
 }
 
 func parse_transaction(transaction string) (string, string, string, uint64) {
