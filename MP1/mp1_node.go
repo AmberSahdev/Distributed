@@ -193,9 +193,8 @@ func handleMessageChannel() {
 			if m_ptr.isAlreadyReceived() {
 				continue
 			}
-			fmt.Println("MESSAGE RECEIVED", m_ptr)
+			// fmt.Println("MESSAGE RECEIVED", m_ptr)
 			if m_ptr.SenderMessageNumber < 0 { // Handling of a local event
-
 				if m_ptr.OriginalSender != localNodeNum {
 					panic("PANIC incomingMessage.OriginalSender != localNodeNum 1")
 				}
@@ -206,17 +205,15 @@ func handleMessageChannel() {
 				maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
 				heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
-				// fmt.Println("Step 1: Local event:", m_ptr)
+				//fmt.Println("Step 1: Local event:", m_ptr)
 				rMulticast(*m_ptr)
 				continue
-
 			} else { // Handling event received from a different node
 				if m_ptr.OriginalSender == localNodeNum {
 					fmt.Println(m_ptr)
 					fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
 					panic("PANIC  m_ptr.OriginalSender == localNodeNum, we should've filtered this out")
 				}
-
 				nodeList[m_ptr.OriginalSender].senderMessageNum = m_ptr.SenderMessageNumber
 				if m_ptr.IsRMulticast {
 					rMulticast(*m_ptr)
@@ -242,7 +239,7 @@ func handleMessageChannel() {
 					m_ptr.Transaction = pq[idx].value.Transaction
 					m_ptr.SequenceNumber = pq[idx].priority
 					rMulticast(*m_ptr)
-					// fmt.Println("Step 3: rMulticasted Final Sequence : ", m_ptr)
+					fmt.Println("Step 3: rMulticasted Final Sequence : ", m_ptr)
 					maxFinalSeqNum = max(m_ptr.SequenceNumber, maxFinalSeqNum)
 				}
 				heap.Fix(&pq, idx)
