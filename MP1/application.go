@@ -43,7 +43,7 @@ func parse_transaction(transaction string) (string, string, string, uint64) {
 }
 
 func print_balances() {
-	balances[""] = 0
+	balances = make(map[string]uint64)
 	for {
 		time.Sleep(5 * time.Second)
 		fmt.Print("\nBALANCES  ")
