@@ -21,6 +21,8 @@ var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan Message
 
+//var pq PriorityQueue // used to keep track of priority/sequence number of messages to attain total order rMulticast
+
 func (destNode *nodeComms) communicationTask() {
 	// fmt.Println("preparing To Receive m's")
 	tcpEnc := gob.NewEncoder(destNode.conn)
@@ -94,7 +96,7 @@ func receiveIncomingData(conn net.Conn) {
 	localReceivingChannel <- ConnUpdateMessage{false, incomingNodeNum}
 	now := time.Now()
 	nanoseconds := float64(now.UnixNano()) / 1e9
-	fmt.Printf("%f - Node %d disconnected, %v\n", nanoseconds, incomingNodeNum, err)
+	fmt.Printf("\n%f - Node %d disconnected, %v\n", nanoseconds, incomingNodeNum, err)
 }
 
 func handleAllIncomingConns(listener net.Listener) {
@@ -176,6 +178,17 @@ func (m *BankMessage) needsProposal() bool {
 
 func (m *BankMessage) setTransactionId() {
 	m.TransactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.SenderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {OriginalSender, SenderMessageNumber[55:0]}
+}
+
+func removeDeadHead(pqPtr *PriorityQueue) {
+	pq := *pqPtr
+	headNodeNum := pq[0].value.TransactionId >> 56
+	for !nodeList[headNodeNum].isConnected {
+		fmt.Println("Sequencer for message at top of the queue died")
+		_ = heap.Pop(&pq).(*Item)
+		heap.Fix(&pq, 0)
+		headNodeNum = pq[0].value.TransactionId >> 56
+	}
 }
 
 // TODO Biggest Fuck, drains the Message Channel
@@ -288,7 +301,7 @@ func handleMessageChannel() {
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
-
+		removeDeadHead(&pq)
 	}
 }
 
