@@ -106,8 +106,7 @@ func handleAllIncomingConns(listener net.Listener) {
 		conn, err = listener.Accept()
 		go receiveIncomingData(conn) // open up a go routine
 	}
-	// TODO consider replacing this with panic
-	fmt.Println("ERROR receiving incoming connections")
+	panic("ERROR receiving incoming connections")
 	_ = listener.Close()
 }
 
@@ -138,7 +137,6 @@ func handleLocalEventGenerator() {
 
 }
 
-// TODO figure out how to block until everyone is connected
 func allNodesAreConnected() bool {
 	return numConns == numNodes
 }
@@ -191,7 +189,6 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 	}
 }
 
-// TODO Biggest Fuck, drains the Message Channel
 func handleMessageChannel() {
 	// Decentralized Causal + Total Ordering Protocol
 	pq := make(PriorityQueue, 0)
@@ -322,10 +319,11 @@ func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
 		/*
-			result := heap.Pop(pqPtr).(*Item) // TODO: put it into our account balances
+			result := heap.Pop(pqPtr).(*Item)
 			commitNum++
 			fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
 		*/
+		// Deliver to our application code.
 		update_balances(heap.Pop(pqPtr).(*Item).value)
 
 		pq := *pqPtr
