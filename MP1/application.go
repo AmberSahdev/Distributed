@@ -46,9 +46,9 @@ func print_balances() {
 	balances = make(map[string]uint64)
 	for {
 		time.Sleep(5 * time.Second)
-		fmt.Print("\nBALANCES  ")
+		fmt.Print("\nBALANCES")
 		for k, v := range balances {
-			fmt.Print("%v:%v ", k, v)
+			fmt.Print(" ", k, ":", v)
 		}
 	}
 }
