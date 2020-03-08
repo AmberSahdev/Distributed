@@ -198,17 +198,18 @@ func handleMessageChannel() {
 				if mPtr.OriginalSender != localNodeNum {
 					panic("PANIC incomingMessage.OriginalSender != localNodeNum 1")
 				}
-
 				nodeList[localNodeNum].senderMessageNum += 1
 				mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 				mPtr.setTransactionId()
 				maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-
 				heap.Push(&pq, NewItem(*mPtr, maxProposedSeqNum))
 				fmt.Println("Step 1: Local event:", mPtr)
 				rMulticast(*mPtr)
 				continue
 			} else { // Handling event received from a different node
+				if len(pq) > 0 {
+					fmt.Println("Top Of Queue:", pq[0])
+				}
 				if mPtr.OriginalSender == localNodeNum {
 					fmt.Println(mPtr)
 					fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
@@ -229,7 +230,6 @@ func handleMessageChannel() {
 				pq[idx].priority = max(mPtr.SequenceNumber, pq[idx].priority)
 				pq[idx].value.SequenceNumber = pq[idx].priority
 				pq[idx].responsesReceived[mPtr.OriginalSender] = true
-
 				if allResponsesReceived(pq[idx].responsesReceived) {
 					pq[idx].value.IsFinal = true
 					mPtr.IsFinal = true
@@ -263,7 +263,6 @@ func handleMessageChannel() {
 				pq[idx].priority = mPtr.SequenceNumber // update priority in pq = final priority
 				pq[idx].value = *mPtr                  // copy the Message with the contents
 				heap.Fix(&pq, idx)
-
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
 			}
