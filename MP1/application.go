@@ -43,9 +43,10 @@ func parse_transaction(transaction string) (string, string, string, uint64) {
 }
 
 func print_balances() {
+	balances[""] = 0
 	for {
 		time.Sleep(5 * time.Second)
-		fmt.Print("BALANCES  ")
+		fmt.Print("\nBALANCES  ")
 		for k, v := range balances {
 			fmt.Print("%v:%v ", k, v)
 		}
