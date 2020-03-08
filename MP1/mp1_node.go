@@ -136,13 +136,8 @@ func handleLocalEventGenerator() {
 }
 
 // TODO figure out how to block until everyone is connected
-func waitForAllNodesSync() {
-	time.Sleep(5 * time.Second)
-	if numConns != numNodes {
-		// TODO potentially insert a panic here
-		fmt.Println("Failed to establish all expected connections")
-		fmt.Println("numConns: %d, numNodes: %d", numConns, numNodes)
-	}
+func allNodesAreConnected() bool {
+	return numConns == numNodes
 }
 
 func setupConnections(hostList []string) {
@@ -163,15 +158,14 @@ func setupConnections(hostList []string) {
 			nodeList[curNodeNum].openOutgoingConn()
 		}
 	}
-	waitForAllNodesSync()
 }
 
 func (m *BankMessage) isAlreadyReceived() bool {
 	return m.IsRMulticast && nodeList[m.OriginalSender].senderMessageNum >= m.SenderMessageNumber
 }
 
-func (m *BankMessage) isProposal() bool {
-	return m.SequenceNumber >= 0 && !m.IsFinal
+func (m *BankMessage) isLocalProposal() bool {
+	return m.SequenceNumber >= 0 && !m.IsFinal && uint8(m.TransactionId>>(64-8)) == localNodeNum
 }
 
 func (m *BankMessage) needsProposal() bool {
@@ -188,16 +182,18 @@ func handleMessageChannel() {
 	pq := make(PriorityQueue, 0)
 	var maxFinalSeqNum int64 = 0
 	var maxProposedSeqNum int64 = 0
-
+	if allNodesAreConnected() {
+		go handleLocalEventGenerator()
+	}
 	for incoming := range localReceivingChannel {
 		switch incomingMessage := incoming.(type) {
 		case BankMessage:
 			m_ptr := new(BankMessage)
 			*m_ptr = incomingMessage
-			// fmt.Println("MESSAGE RECEIVED", m_ptr)
 			if m_ptr.isAlreadyReceived() {
 				continue
 			}
+			fmt.Println("MESSAGE RECEIVED", m_ptr)
 			if m_ptr.SenderMessageNumber < 0 { // Handling of a local event
 
 				if m_ptr.OriginalSender != localNodeNum {
@@ -211,7 +207,7 @@ func handleMessageChannel() {
 
 				heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
 				// fmt.Println("Step 1: Local event:", m_ptr)
-				bMulticast(*m_ptr)
+				rMulticast(*m_ptr)
 				continue
 
 			} else { // Handling event received from a different node
@@ -227,7 +223,7 @@ func handleMessageChannel() {
 				}
 			}
 			// delivery of Message to ISIS handler occurs here
-			if m_ptr.isProposal() { // Receiving Message 2 and sending Message 3 handled here
+			if m_ptr.isLocalProposal() { // Receiving Message 2 and sending Message 3 handled here
 				idx := pq.find(m_ptr.TransactionId)
 				if idx == math.MaxInt32 {
 					panic("FIND RETURNED MAX INDEX 1")
@@ -254,12 +250,11 @@ func handleMessageChannel() {
 			} else if m_ptr.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
 				maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 				heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
-				prevSender := m_ptr.OriginalSender
 				m_ptr.OriginalSender = localNodeNum
 				nodeList[localNodeNum].senderMessageNum += 1
 				m_ptr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
 				m_ptr.SequenceNumber = maxProposedSeqNum
-				nodeList[prevSender].unicast(*m_ptr)
+				rMulticast(*m_ptr)
 				// fmt.Println("Sent Proposal Message 2:", m_ptr)
 			} else if m_ptr.IsFinal { // Receiving Message 3 here
 				// reorder based on final priority
@@ -274,13 +269,14 @@ func handleMessageChannel() {
 
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, m_ptr.SequenceNumber)
-			} else {
-				fmt.Println(m_ptr)
-				panic("NO CONDITION SATISFIED by above message")
 			}
 		case ConnUpdateMessage:
 			if incomingMessage.isConnected {
 				nodeList[incomingMessage.nodeNumber].openOutgoingConn()
+				if allNodesAreConnected() {
+					fmt.Println("All Nodes Connected, starting!")
+					go handleLocalEventGenerator()
+				}
 			} else {
 				nodeList[incomingMessage.nodeNumber].closeOutgoingConn()
 			}
@@ -346,6 +342,5 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
 	setupConnections(hostList)
-	go handleLocalEventGenerator()
 	handleMessageChannel()
 }
