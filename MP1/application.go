@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -46,8 +47,16 @@ func print_balances() {
 	for {
 		time.Sleep(5 * time.Second)
 		fmt.Print("\nBALANCES")
-		for k, v := range balances {
-			fmt.Print(" ", k, ":", v)
+
+		keys := make([]string, 0, len(balances))
+		for k := range balances {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			fmt.Print(" ", k, ":", balances[k])
 		}
 	}
+
 }
