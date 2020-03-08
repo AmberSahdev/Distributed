@@ -24,17 +24,17 @@ var localReceivingChannel chan Message
 func (destNode *nodeComms) communicationTask() {
 	// fmt.Println("preparing To Receive m's")
 	tcpEnc := gob.NewEncoder(destNode.conn)
-
-	defer destNode.conn.Close()
 	// fmt.Println("Ready To Receive m's")
 	for m := range destNode.outbox {
 		err := tcpEnc.Encode(m)
 		// fmt.Println("ENCODE m IN communicationTask:", m)
 		if err != nil {
 			fmt.Println("Failed to send Message, receiver down?")
+			_ = destNode.conn.Close()
 			return
 		}
 	}
+	_ = destNode.conn.Close()
 }
 
 func (destNode *nodeComms) openOutgoingConn() {
@@ -57,7 +57,7 @@ func (destNode *nodeComms) openOutgoingConn() {
 	}
 }
 
-// ran when the incoming connection to this node throws and errror
+// ran when the incoming connection to this node throws and error
 func (destNode *nodeComms) closeOutgoingConn() {
 	destNode.isConnected = false
 	numConns--
@@ -71,23 +71,23 @@ func parseHostTextfile(path string) []string {
 }
 
 func receiveIncomingData(conn net.Conn) {
-	var new_m *BankMessage
+	var newM *BankMessage
 	var incomingNodeNum uint8 = math.MaxUint8
 	tcpDecode := gob.NewDecoder(conn)
-	new_m = new(BankMessage)
-	err := tcpDecode.Decode(new_m)
+	newM = new(BankMessage)
+	err := tcpDecode.Decode(newM)
 	if err == nil {
-		incomingNodeNum = new_m.OriginalSender
+		incomingNodeNum = newM.OriginalSender
 		if !nodeList[incomingNodeNum].isConnected {
 			// set up a new connection
 			localReceivingChannel <- ConnUpdateMessage{true, incomingNodeNum}
 		}
-		err = tcpDecode.Decode(new_m)
+		err = tcpDecode.Decode(newM)
 		for err == nil {
 			// fmt.Println("DECODE m IN receiveIncomingData:", new_m)
-			localReceivingChannel <- *new_m
-			new_m = new(BankMessage)
-			err = tcpDecode.Decode(new_m)
+			localReceivingChannel <- *newM
+			newM = new(BankMessage)
+			err = tcpDecode.Decode(newM)
 		}
 	}
 	localReceivingChannel <- ConnUpdateMessage{false, incomingNodeNum}
@@ -97,7 +97,6 @@ func receiveIncomingData(conn net.Conn) {
 }
 
 func handleAllIncomingConns(listener net.Listener) {
-	defer listener.Close()
 	var conn net.Conn
 	var err error = nil
 	for err == nil {
@@ -106,6 +105,7 @@ func handleAllIncomingConns(listener net.Listener) {
 	}
 	// TODO consider replacing this with panic
 	fmt.Println("ERROR receiving incoming connections")
+	_ = listener.Close()
 }
 
 func openListener() net.Listener {
@@ -143,7 +143,7 @@ func allNodesAreConnected() bool {
 func setupConnections(hostList []string) {
 	var curNodeNum uint8
 	nodeList = make([]nodeComms, numNodes)
-	// Populate list of node connection infomrmation with string in format of "address:port"
+	// Populate list of node connection information with string in format of "address:port"
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 	}
@@ -188,84 +188,84 @@ func handleMessageChannel() {
 	for incoming := range localReceivingChannel {
 		switch incomingMessage := incoming.(type) {
 		case BankMessage:
-			m_ptr := new(BankMessage)
-			*m_ptr = incomingMessage
-			if m_ptr.isAlreadyReceived() {
+			mPtr := new(BankMessage)
+			*mPtr = incomingMessage
+			if mPtr.isAlreadyReceived() {
 				continue
 			}
-			// fmt.Println("MESSAGE RECEIVED", m_ptr)
-			if m_ptr.SenderMessageNumber < 0 { // Handling of a local event
-				if m_ptr.OriginalSender != localNodeNum {
+			// fmt.Println("MESSAGE RECEIVED", mPtr)
+			if mPtr.SenderMessageNumber < 0 { // Handling of a local event
+				if mPtr.OriginalSender != localNodeNum {
 					panic("PANIC incomingMessage.OriginalSender != localNodeNum 1")
 				}
 
 				nodeList[localNodeNum].senderMessageNum += 1
-				m_ptr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
-				m_ptr.setTransactionId()
+				mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
+				mPtr.setTransactionId()
 				maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
 
-				heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
-				//fmt.Println("Step 1: Local event:", m_ptr)
-				rMulticast(*m_ptr)
+				heap.Push(&pq, NewItem(*mPtr, maxProposedSeqNum))
+				fmt.Println("Step 1: Local event:", mPtr)
+				rMulticast(*mPtr)
 				continue
 			} else { // Handling event received from a different node
-				if m_ptr.OriginalSender == localNodeNum {
-					fmt.Println(m_ptr)
+				if mPtr.OriginalSender == localNodeNum {
+					fmt.Println(mPtr)
 					fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
-					panic("PANIC  m_ptr.OriginalSender == localNodeNum, we should've filtered this out")
+					panic("PANIC  mPtr.OriginalSender == localNodeNum, we should've filtered this out")
 				}
-				nodeList[m_ptr.OriginalSender].senderMessageNum = m_ptr.SenderMessageNumber
-				if m_ptr.IsRMulticast {
-					rMulticast(*m_ptr)
+				nodeList[mPtr.OriginalSender].senderMessageNum = mPtr.SenderMessageNumber
+				if mPtr.IsRMulticast {
+					rMulticast(*mPtr)
 				}
 			}
 			// delivery of Message to ISIS handler occurs here
-			if m_ptr.isLocalProposal() { // Receiving Message 2 and sending Message 3 handled here
-				idx := pq.find(m_ptr.TransactionId)
+			if mPtr.isLocalProposal() { // Receiving Message 2 and sending Message 3 handled here
+				idx := pq.find(mPtr.TransactionId)
 				if idx == math.MaxInt32 {
 					panic("FIND RETURNED MAX INDEX 1")
 				}
 				// update priority in pq = max(proposed priority, local priority)
-				pq[idx].priority = max(m_ptr.SequenceNumber, pq[idx].priority)
+				pq[idx].priority = max(mPtr.SequenceNumber, pq[idx].priority)
 				pq[idx].value.SequenceNumber = pq[idx].priority
-				pq[idx].responsesReceived[m_ptr.OriginalSender] = true
+				pq[idx].responsesReceived[mPtr.OriginalSender] = true
 
 				if allResponsesReceived(pq[idx].responsesReceived) {
 					pq[idx].value.IsFinal = true
-					m_ptr.IsFinal = true
-					m_ptr.OriginalSender = localNodeNum
+					mPtr.IsFinal = true
+					mPtr.OriginalSender = localNodeNum
 					nodeList[localNodeNum].senderMessageNum += 1
-					m_ptr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
-					m_ptr.Transaction = pq[idx].value.Transaction
-					m_ptr.SequenceNumber = pq[idx].priority
-					rMulticast(*m_ptr)
-					fmt.Println("Step 3: rMulticasted Final Sequence : ", m_ptr)
-					maxFinalSeqNum = max(m_ptr.SequenceNumber, maxFinalSeqNum)
+					mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
+					mPtr.Transaction = pq[idx].value.Transaction
+					mPtr.SequenceNumber = pq[idx].priority
+					rMulticast(*mPtr)
+					fmt.Println("Step 3: rMulticast Final Sequence :", mPtr)
+					maxFinalSeqNum = max(mPtr.SequenceNumber, maxFinalSeqNum)
 				}
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
-			} else if m_ptr.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
+			} else if mPtr.needsProposal() { // Receiving Message 1 and sending Message 2 handled here
 				maxProposedSeqNum = findProposalNumber(maxProposedSeqNum, maxFinalSeqNum)
-				heap.Push(&pq, NewItem(*m_ptr, maxProposedSeqNum))
-				m_ptr.OriginalSender = localNodeNum
+				heap.Push(&pq, NewItem(*mPtr, maxProposedSeqNum))
+				mPtr.OriginalSender = localNodeNum
 				nodeList[localNodeNum].senderMessageNum += 1
-				m_ptr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
-				m_ptr.SequenceNumber = maxProposedSeqNum
-				rMulticast(*m_ptr)
-				// fmt.Println("Sent Proposal Message 2:", m_ptr)
-			} else if m_ptr.IsFinal { // Receiving Message 3 here
+				mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
+				mPtr.SequenceNumber = maxProposedSeqNum
+				rMulticast(*mPtr)
+				fmt.Println("Sent Proposal Message 2:", mPtr)
+			} else if mPtr.IsFinal { // Receiving Message 3 here
 				// reorder based on final priority
-				// fmt.Println("Receiving Message 3, Agreed on Priority:", m_ptr)
-				idx := pq.find(m_ptr.TransactionId)
+				fmt.Println("Receiving Message 3, Agreed on Priority:", mPtr)
+				idx := pq.find(mPtr.TransactionId)
 				if idx == math.MaxInt32 {
 					panic("FIND RETURNED MAX INDEX 2")
 				}
-				pq[idx].priority = m_ptr.SequenceNumber // update priority in pq = final priority
-				pq[idx].value = *m_ptr                  // copy the Message with the contents
+				pq[idx].priority = mPtr.SequenceNumber // update priority in pq = final priority
+				pq[idx].value = *mPtr                  // copy the Message with the contents
 				heap.Fix(&pq, idx)
 
 				deliverAgreedTransactions(&pq)
-				maxFinalSeqNum = max(maxFinalSeqNum, m_ptr.SequenceNumber)
+				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
 			}
 		case ConnUpdateMessage:
 			if incomingMessage.isConnected {
@@ -278,7 +278,7 @@ func handleMessageChannel() {
 				nodeList[incomingMessage.nodeNumber].closeOutgoingConn()
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
+			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
 
 	}
@@ -292,18 +292,18 @@ func findProposalNumber(maxProposedSeqNum int64, maxFinalSeqNum int64) int64 {
 	return maxProposedSeqNum + 1
 }
 
-func deliverAgreedTransactions(pq_ptr *PriorityQueue) {
+func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 	// commit agreed transactions to account
-	pq := *pq_ptr
+	pq := *pqPtr
 	if len(pq) == 0 {
 		return
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
-		result := heap.Pop(pq_ptr).(*Item) // TODO: put it into our account balances
+		result := heap.Pop(pqPtr).(*Item) // TODO: put it into our account balances
 		commitNum++
 		fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
-		pq := *pq_ptr
+		pq := *pqPtr
 		if len(pq) == 0 {
 			return
 		}
