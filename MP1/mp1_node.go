@@ -146,6 +146,7 @@ func setupConnections(hostList []string) {
 	// Populate list of node connection information with string in format of "address:port"
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
+		nodeList[curNodeNum].senderMessageNum = 0
 	}
 	listener := openListener()
 	go handleAllIncomingConns(listener)
@@ -191,6 +192,7 @@ func handleMessageChannel() {
 			mPtr := new(BankMessage)
 			*mPtr = incomingMessage
 			if mPtr.isAlreadyReceived() {
+				fmt.Println("Message Already Delivered:", mPtr)
 				continue
 			}
 			// fmt.Println("MESSAGE RECEIVED", mPtr)
@@ -207,7 +209,7 @@ func handleMessageChannel() {
 				rMulticast(*mPtr)
 				continue
 			} else { // Handling event received from a different node
-				if len(pq) > 0 {
+				for i := 0; i < len(pq); i++ {
 					fmt.Println("Top Of Queue:", pq[0])
 				}
 				if mPtr.OriginalSender == localNodeNum {
@@ -220,8 +222,10 @@ func handleMessageChannel() {
 					rMulticast(*mPtr)
 				}
 			}
+			fmt.Println("Message Received:", mPtr)
 			// delivery of Message to ISIS handler occurs here
 			if mPtr.isLocalProposal() { // Receiving Message 2 and sending Message 3 handled here
+				fmt.Println("Message Priority Received:", mPtr)
 				idx := pq.find(mPtr.TransactionId)
 				if idx == math.MaxInt32 {
 					panic("FIND RETURNED MAX INDEX 1")
@@ -265,6 +269,8 @@ func handleMessageChannel() {
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
+			} else {
+				fmt.Println("Message Skipped 2:", mPtr)
 			}
 		case ConnUpdateMessage:
 			if incomingMessage.isConnected {

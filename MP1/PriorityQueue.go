@@ -26,12 +26,16 @@ func NewItem(m BankMessage, priorityNum int64) *Item {
 type PriorityQueue []*Item
 
 func (pq PriorityQueue) find(transactionId uint64) int {
+	result := math.MaxInt32
 	for i := 0; i < len(pq); i++ {
 		if pq[i].value.TransactionId == transactionId {
-			return i
+			if result != math.MaxInt32 {
+				panic("Duplicates in PQ!")
+			}
+			result = i
 		}
 	}
-	return math.MaxInt32 // if nothing matches
+	return result
 }
 
 func (pq PriorityQueue) Len() int { return len(pq) }
