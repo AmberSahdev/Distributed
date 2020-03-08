@@ -327,7 +327,7 @@ func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 			fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
 		*/
 		// Deliver to our application code.
-		fmt.Println("Popping off PQ")
+		fmt.Println("\n Popping off PQ")
 		update_balances(heap.Pop(pqPtr).(*Item).value)
 
 		pq := *pqPtr
