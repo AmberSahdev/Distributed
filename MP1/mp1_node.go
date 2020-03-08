@@ -188,6 +188,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 		_ = heap.Pop(&pq).(*Item)
 		heap.Fix(&pq, 0)
 		headNodeNum = pq[0].value.TransactionId >> 56
+		fmt.Println("headNodeNum:", headNodeNum)
 	}
 	fmt.Println("OUT removeDeadHead")
 }
@@ -301,7 +302,7 @@ func handleMessageChannel() {
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
-		removeDeadHead(&pq)
+		//removeDeadHead(&pq)
 	}
 }
 
