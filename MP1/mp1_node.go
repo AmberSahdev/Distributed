@@ -302,7 +302,7 @@ func handleMessageChannel() {
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
-		//removeDeadHead(&pq)
+		removeDeadHead(&pq)
 	}
 }
 
