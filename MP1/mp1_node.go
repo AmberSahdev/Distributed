@@ -216,8 +216,8 @@ func handleMessageChannel() {
 					}
 				*/
 				if mPtr.OriginalSender == localNodeNum {
-					fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
-					fmt.Println(mPtr)
+					//fmt.Println("Message Num:", nodeList[localNodeNum].senderMessageNum)
+					//fmt.Println(mPtr)
 					panic("PANIC  mPtr.OriginalSender == localNodeNum, we should've filtered this out")
 				}
 				nodeList[mPtr.OriginalSender].senderMessageNum = mPtr.SenderMessageNumber
@@ -279,7 +279,7 @@ func handleMessageChannel() {
 			if incomingMessage.isConnected {
 				nodeList[incomingMessage.nodeNumber].openOutgoingConn()
 				if allNodesAreConnected() {
-					fmt.Println("All Nodes Connected, starting!")
+					//fmt.Println("All Nodes Connected, starting!")
 					go handleLocalEventGenerator()
 				}
 			} else {
@@ -308,9 +308,13 @@ func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
 	for m.IsFinal {
-		result := heap.Pop(pqPtr).(*Item) // TODO: put it into our account balances
-		commitNum++
-		fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
+		/*
+			result := heap.Pop(pqPtr).(*Item) // TODO: put it into our account balances
+			commitNum++
+			fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
+		*/
+		update_balances(heap.Pop(pqPtr).(*Item).value)
+
 		pq := *pqPtr
 		if len(pq) == 0 {
 			return
@@ -347,5 +351,6 @@ func main() {
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
 	setupConnections(hostList)
+	go print_balances()
 	handleMessageChannel()
 }
