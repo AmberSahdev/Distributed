@@ -180,7 +180,9 @@ func (m *BankMessage) setTransactionId() {
 
 func removeDeadHead(pqPtr *PriorityQueue) {
 	pq := *pqPtr
+	fmt.Println("IN removeDeadHead")
 	headNodeNum := pq[0].value.TransactionId >> 56
+	fmt.Println("headNodeNum:", headNodeNum)
 	for !nodeList[headNodeNum].isConnected {
 		fmt.Println("Sequencer for message at top of the queue died")
 		_ = heap.Pop(&pq).(*Item)
