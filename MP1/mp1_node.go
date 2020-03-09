@@ -186,7 +186,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 		return
 	}
 	headNodeNum := pq[0].value.TransactionId >> 56
-	fmt.Println("headNodeNum:", headNodeNum)
+	fmt.Println("\nheadNodeNum:", headNodeNum)
 	for !nodeList[headNodeNum].isConnected {
 		fmt.Println("Sequencer for message at top of the queue died")
 		_ = heap.Pop(&pq).(*Item)
@@ -301,6 +301,7 @@ func handleMessageChannel() {
 					go handleLocalEventGenerator()
 				}
 			} else {
+				fmt.Println("In ConnUpdateMessage:closeOutgoingConn")
 				nodeList[incomingMessage.nodeNumber].closeOutgoingConn()
 			}
 		default:
@@ -331,9 +332,7 @@ func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 			commitNum++
 			fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
 		*/
-		// Deliver to our application code.
-		fmt.Println("\n Popping off PQ")
-		update_balances(heap.Pop(pqPtr).(*Item).value)
+		update_balances(heap.Pop(pqPtr).(*Item).value) // Deliver to our application code
 
 		pq := *pqPtr
 		if len(pq) == 0 {
