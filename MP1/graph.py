@@ -67,7 +67,8 @@ def plot_bandwidth():
                     avgBandwidth.append(np.sum(bandwidth))
 
             # Linear scale plot
-            plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
+            plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, 'm.:', label='bandwidth')
+            # plt.scatter((np.arange(seconds/window)*window).tolist(), avgBandwidth, marker='.', c='m', label='bandwidth')
             plt.ylabel('Number of Bytes Downloaded')
             plt.xlabel('Time in Seconds')
             plt.title('Bandwidth Graph Linear')
@@ -76,7 +77,8 @@ def plot_bandwidth():
             plt.close()
 
             # Logarithmic scale on the y-axis
-            plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
+            plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, 'bx:', label='bandwidth')
+            # plt.scatter((np.arange(seconds/window)*window).tolist(), avgBandwidth, marker='x', c='b', label='bandwidth')
             plt.yscale("log")
             plt.ylabel('Number of Bytes Downloaded')
             plt.xlabel('Time in Seconds')
