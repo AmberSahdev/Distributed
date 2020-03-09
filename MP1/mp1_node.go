@@ -187,6 +187,12 @@ func (m *BankMessage) needsProposal() bool {
 
 func (m *BankMessage) setTransactionId() {
 	m.TransactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.SenderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {OriginalSender, SenderMessageNumber[55:0]}
+
+	now := time.Now()
+	nanoseconds := float64(now.UnixNano()) / 1e9
+	filePointers[0].WriteString(fmt.Sprintf("%v ", nanoseconds))
+	filePointers[0].WriteString(fmt.Sprintf("%v ", m.TransactionId))
+	filePointers[0].WriteString(fmt.Sprintf("CREATED\n"))
 }
 
 /*
@@ -305,6 +311,12 @@ func handleMessageChannel() {
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
+
+				now := time.Now()
+				nanoseconds := float64(now.UnixNano()) / 1e9
+				filePointers[0].WriteString(fmt.Sprintf("%v ", nanoseconds))
+				filePointers[0].WriteString(fmt.Sprintf("%v ", mPtr.TransactionId))
+				filePointers[0].WriteString(fmt.Sprintf("COMMITTED\n"))
 			} else if mPtr.IsFinal && mPtr.SequenceNumber == -1 {
 				nodeList[mPtr.TransactionId].isDead[mPtr.OriginalSender] = true
 				deliverAgreedTransactions(&pq)
