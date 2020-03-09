@@ -206,6 +206,7 @@ func handleMessageChannel() {
 		go handleLocalEventGenerator()
 	}
 	for incoming := range localReceivingChannel {
+		removeDeadHead(&pq)
 		switch incomingMessage := incoming.(type) {
 		case BankMessage:
 			mPtr := new(BankMessage)
@@ -307,7 +308,6 @@ func handleMessageChannel() {
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
-		removeDeadHead(&pq)
 	}
 }
 
