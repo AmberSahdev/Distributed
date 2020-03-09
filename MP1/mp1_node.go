@@ -20,6 +20,7 @@ var numConns uint8     // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
 var nodeList []nodeComms
 var localReceivingChannel chan Message
+var filePointers [2]*os.File
 
 //var pq PriorityQueue // used to keep track of priority/sequence number of messages to attain total order rMulticast
 
@@ -373,6 +374,12 @@ func main() {
 	numNodes = uint8(newNumNodes)
 	localNodeNum = uint8(newNodeNum)
 	localReceivingChannel = make(chan Message, 65536)
+
+	fDelay, fBandwidth := create_files()
+	filePointers[0] = fDelay
+	filePointers[1] = fBandwidth
+	go update_files(filePointers)
+
 	setupConnections(hostList)
 	go print_balances()
 	handleMessageChannel()
