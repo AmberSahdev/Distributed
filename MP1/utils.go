@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"time"
 	"unsafe"
 )
@@ -59,7 +60,7 @@ func update_files(filePointers [2]*os.File) {
 func create_files() (*os.File, *os.File) {
 	fDelay, err := os.Create("delay.txt")
 	check(err)
-	fBandwidth, err := os.Create("bandwidth_node" + string(localNodeNum) + ".txt")
+	fBandwidth, err := os.Create("bandwidth_node" + strconv.Itoa(int(localNodeNum)) + ".txt")
 	check(err)
 	return fDelay, fBandwidth
 }
