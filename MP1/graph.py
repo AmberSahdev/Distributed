@@ -45,12 +45,13 @@ def plot_bandwidth():
     # for the bandwidth, you should track the average bandwidth across each second of the experiment.
     seconds = 0
     avgBandwidth = []
+    window = 5 # 5 seconds
     with open('bandwidth.txt') as file:
         for line in file:
             if line == "\n":
                 line = "0 \n"# continue
             line = line[:-1] # stripping the "\n"
-            seconds += 5 # 1
+            seconds += window # 1
             numbers = line.split(" ")[:-1]
             for i in range(len(numbers)):
                 if numbers[i] != "":
@@ -62,7 +63,7 @@ def plot_bandwidth():
             avgBandwidth.append(np.sum(bandwidth))
 
     # Linear scale plot
-    plt.plot(np.arange(seconds).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
+    plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
     plt.ylabel('Length of Strings/Number of Bytes')
     plt.xlabel('Time in Seconds')
     plt.title('Bandwidth Graph')

@@ -59,7 +59,7 @@ func update_files(filePointers [2]*os.File) {
 func create_files() (*os.File, *os.File) {
 	fDelay, err := os.Create("delay.txt")
 	check(err)
-	fBandwidth, err := os.Create("bandwidth.txt")
+	fBandwidth, err := os.Create("bandwidth_node" + string(localNodeNum) + ".txt")
 	check(err)
 	return fDelay, fBandwidth
 }
