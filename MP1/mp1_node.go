@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var commitNum int
+// var commitNum int
 var numNodes uint8     // specified parameter, number of starting nodes
 var numConns uint8     // tracks number of other nodes connected to this node
 var localNodeNum uint8 // tracks local node's number
@@ -38,6 +38,15 @@ func (destNode *nodeComms) communicationTask() {
 		}
 	}
 	_ = destNode.conn.Close()
+}
+
+func (destNode *nodeComms) isConfirmedDead() bool {
+	for i := uint8(0); i < numNodes; i++ {
+		if nodeList[i].isConnected && !destNode.isDead[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (destNode *nodeComms) openOutgoingConn() {
@@ -95,9 +104,6 @@ func receiveIncomingData(conn net.Conn) {
 		}
 	}
 	localReceivingChannel <- ConnUpdateMessage{false, incomingNodeNum}
-	now := time.Now()
-	nanoseconds := float64(now.UnixNano()) / 1e9
-	fmt.Printf("\n%f - Node %d disconnected, %v\n", nanoseconds, incomingNodeNum, err)
 }
 
 func handleAllIncomingConns(listener net.Listener) {
@@ -107,8 +113,8 @@ func handleAllIncomingConns(listener net.Listener) {
 		conn, err = listener.Accept()
 		go receiveIncomingData(conn) // open up a go routine
 	}
-	panic("ERROR receiving incoming connections")
 	_ = listener.Close()
+	panic("ERROR receiving incoming connections")
 }
 
 func openListener() net.Listener {
@@ -149,6 +155,10 @@ func setupConnections(hostList []string) {
 	for curNodeNum = 0; curNodeNum < numNodes; curNodeNum++ {
 		nodeList[curNodeNum].address = hostList[curNodeNum]
 		nodeList[curNodeNum].senderMessageNum = 0
+		nodeList[curNodeNum].isDead = make([]bool, numNodes)
+		for i := uint8(0); i < numNodes; i++ {
+			nodeList[curNodeNum].isDead[i] = false
+		}
 	}
 	listener := openListener()
 	go handleAllIncomingConns(listener)
@@ -179,11 +189,10 @@ func (m *BankMessage) setTransactionId() {
 	m.TransactionId = (uint64(localNodeNum) << (64 - 8)) | (uint64(m.SenderMessageNumber) & 0x00FFFFFFFFFFFFFF) // {OriginalSender, SenderMessageNumber[55:0]}
 }
 
+/*
 func removeDeadHead(pqPtr *PriorityQueue) {
-	//fmt.Println("IN removeDeadHead")
 	pq := *pqPtr
 	if len(pq) == 0 {
-		//fmt.Println("OUT removeDeadHead")
 		return
 	}
 	headNodeNum := pq[0].value.TransactionId >> 56
@@ -200,6 +209,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 	}
 	//fmt.Println("OUT removeDeadHead")
 }
+*/
 
 func handleMessageChannel() {
 	// Decentralized Causal + Total Ordering Protocol
@@ -210,8 +220,7 @@ func handleMessageChannel() {
 		go handleLocalEventGenerator()
 	}
 	for incoming := range localReceivingChannel {
-		removeDeadHead(&pq)
-
+		// removeDeadHead(&pq)
 		switch incomingMessage := incoming.(type) {
 		case BankMessage:
 			mPtr := new(BankMessage)
@@ -284,7 +293,7 @@ func handleMessageChannel() {
 				mPtr.SequenceNumber = maxProposedSeqNum
 				rMulticast(*mPtr)
 				// fmt.Println("Sent Proposal Message 2:", mPtr)
-			} else if mPtr.IsFinal { // Receiving Message 3 here
+			} else if mPtr.IsFinal && mPtr.SequenceNumber != -1 { // Receiving Message 3 here
 				// reorder based on final priority
 				// fmt.Println("Receiving Message 3, Agreed on Priority:", mPtr)
 				idx := pq.find(mPtr.TransactionId)
@@ -296,6 +305,9 @@ func handleMessageChannel() {
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
+			} else if mPtr.IsFinal && mPtr.SequenceNumber == -1 {
+				nodeList[mPtr.TransactionId].isDead[mPtr.OriginalSender] = true
+				deliverAgreedTransactions(&pq)
 			} else {
 				// fmt.Println("Message Skipped 2:", mPtr)
 			}
@@ -308,8 +320,25 @@ func handleMessageChannel() {
 					go handleLocalEventGenerator()
 				}
 			} else {
-				fmt.Println("In ConnUpdateMessage:closeOutgoingConn")
+				now := time.Now()
+				nanoseconds := float64(now.UnixNano()) / 1e9
+				fmt.Printf("\n%f - Node %d disconnected\n", nanoseconds, incomingMessage.nodeNumber)
+				// fmt.Println("In ConnUpdateMessage:closeOutgoingConn")
+				mPtr := new(BankMessage)
+				mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
+				*mPtr = BankMessage{
+					OriginalSender:      localNodeNum,
+					SenderMessageNumber: nodeList[localNodeNum].senderMessageNum,
+					Transaction:         "",
+					TransactionId:       uint64(incomingMessage.nodeNumber),
+					SequenceNumber:      -1,
+					IsFinal:             true,
+					IsRMulticast:        false,
+				}
+				rMulticast(*mPtr)
+				nodeList[incomingMessage.nodeNumber].isDead[localNodeNum] = true
 				nodeList[incomingMessage.nodeNumber].closeOutgoingConn()
+				deliverAgreedTransactions(&pq)
 			}
 			filePointers[1].WriteString(fmt.Sprintf("%d ", 2)) // 2 bytes of data in ConnUpdateMessage
 		default:
@@ -333,14 +362,19 @@ func deliverAgreedTransactions(pqPtr *PriorityQueue) {
 		return
 	}
 	m := pq[0].value // highest priority // pq[0] is element with max priority
-	for m.IsFinal {
+	for true {
+		if m.IsFinal {
+			update_balances(heap.Pop(pqPtr).(*Item).value) // Deliver to our application code
+		} else if nodeList[m.TransactionId>>(64-8)].isConfirmedDead() {
+			heap.Pop(pqPtr)
+		} else {
+			break
+		}
 		/*
 			result := heap.Pop(pqPtr).(*Item)
 			commitNum++
 			fmt.Println("Delivering Transaction, commitNum:", commitNum, "Message:", result.value)
 		*/
-		update_balances(heap.Pop(pqPtr).(*Item).value) // Deliver to our application code
-
 		pq := *pqPtr
 		if len(pq) == 0 {
 			return
@@ -366,7 +400,7 @@ func main() {
 		fmt.Println("Expected Format: ./node [number of nodes] [path to file for hostList] [Local Node Number]")
 		return
 	}
-	commitNum = 0
+	// commitNum = 0
 	numConns = 1
 	newNumNodes, err := strconv.Atoi(arguments[1])
 	check(err)

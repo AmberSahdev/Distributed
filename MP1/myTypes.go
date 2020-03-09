@@ -7,6 +7,7 @@ type nodeComms struct {
 	address          string   // outgoing node's address:port string
 	conn             net.Conn // TODO find out if pass by value or pointer is better here
 	outbox           chan BankMessage
+	isDead           []bool
 	isConnected      bool
 }
 
