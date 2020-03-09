@@ -45,15 +45,13 @@ func max(x, y int64) int64 {
 func update_files(filePointers [2]*os.File) {
 	// Adds a new line to our two files after every 5 seconds
 	for {
-		if allNodesAreConnected() {
-			oneSecMark1 := time.Now()
-			for {
-				oneSecMark2 := time.Now()
-				if oneSecMark2.Sub(oneSecMark1).Seconds() >= 5 {
-					oneSecMark1 = time.Now()
-					filePointers[0].WriteString("\n")
-					filePointers[1].WriteString("\n")
-				}
+		oneSecMark1 := time.Now()
+		for {
+			oneSecMark2 := time.Now()
+			if oneSecMark2.Sub(oneSecMark1).Seconds() >= 5 {
+				oneSecMark1 = time.Now()
+				filePointers[0].WriteString("\n")
+				filePointers[1].WriteString("\n")
 			}
 		}
 	}
