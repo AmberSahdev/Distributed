@@ -15,8 +15,12 @@ func update_balances(m BankMessage) {
 	if transactionType == "DEPOSIT" {
 		balances[account1] += amount
 	} else if transactionType == "TRANSFER" {
-		balances[account1] -= amount
-		balances[account2] += amount
+		if balances[account1]-amount < 0 {
+			return
+		} else {
+			balances[account1] -= amount
+			balances[account2] += amount
+		}
 	}
 }
 
