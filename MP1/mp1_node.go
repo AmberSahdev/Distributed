@@ -190,7 +190,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 	for !nodeList[headNodeNum].isConnected {
 		fmt.Println("Sequencer for message at top of the queue died")
 		_ = heap.Pop(&pq).(*Item)
-		//heap.Fix(&pq, 0)
+		heap.Fix(&pq, 0)
 		if len(pq) == 0 {
 			return
 		}
