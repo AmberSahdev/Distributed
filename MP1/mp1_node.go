@@ -287,12 +287,6 @@ func handleMessageChannel() {
 					rMulticast(*mPtr)
 					// fmt.Println("Step 3: rMulticast Final Sequence :", mPtr)
 					maxFinalSeqNum = max(mPtr.SequenceNumber, maxFinalSeqNum)
-
-					now := time.Now()
-					nanoseconds := float64(now.UnixNano()) / 1e9
-					filePointers[0].WriteString(fmt.Sprintf("%v ", nanoseconds))
-					filePointers[0].WriteString(fmt.Sprintf("%v ", mPtr.TransactionId))
-					filePointers[0].WriteString(fmt.Sprintf("COMMITTED\n"))
 				}
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
@@ -317,6 +311,13 @@ func handleMessageChannel() {
 				heap.Fix(&pq, idx)
 				deliverAgreedTransactions(&pq)
 				maxFinalSeqNum = max(maxFinalSeqNum, mPtr.SequenceNumber)
+
+				// logging
+				now := time.Now()
+				nanoseconds := float64(now.UnixNano()) / 1e9
+				filePointers[0].WriteString(fmt.Sprintf("%v ", nanoseconds))
+				filePointers[0].WriteString(fmt.Sprintf("%v ", mPtr.TransactionId))
+				filePointers[0].WriteString(fmt.Sprintf("COMMITTED\n"))
 			} else if mPtr.IsFinal && mPtr.SequenceNumber == -1 {
 				nodeList[mPtr.TransactionId].isDead[mPtr.OriginalSender] = true
 				deliverAgreedTransactions(&pq)
