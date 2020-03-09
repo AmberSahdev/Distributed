@@ -187,7 +187,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 	}
 	headNodeNum := pq[0].value.TransactionId >> 56
 	fmt.Println("\nheadNodeNum 1:", headNodeNum)
-	for !nodeList[headNodeNum].isConnected {
+	for !nodeList[headNodeNum].isConnected && !pq[0].value.IsFinal {
 		fmt.Println("Sequencer for message at top of the queue died")
 		_ = heap.Pop(&pq).(*Item)
 		heap.Fix(&pq, 0)
