@@ -47,9 +47,10 @@ def plot_bandwidth():
     avgBandwidth = []
     window = 5 # 5 seconds
     nodeNums = np.arange(10)
+
     for nodeNum in nodeNums:
         try:
-            with open("bandwidth_node" + nodeNum + ".txt") as file:
+            with open("bandwidth_node" + str(nodeNum) + ".txt") as file:
                 for line in file:
                     if line == "\n":
                         line = "0 \n"# continue
@@ -67,19 +68,19 @@ def plot_bandwidth():
 
             # Linear scale plot
             plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
-            plt.ylabel('Length of Strings/Number of Bytes')
+            plt.ylabel('Number of Bytes Downloaded')
             plt.xlabel('Time in Seconds')
-            plt.title('Bandwidth Graph')
+            plt.title('Bandwidth Graph Linear')
             plt.grid()
             plt.savefig('bandwidth_linear.png')
             plt.close()
 
             # Logarithmic scale on the y-axis
-            plt.plot(np.arange(seconds).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
+            plt.plot((np.arange(seconds/window)*window).tolist(), avgBandwidth, c='b', marker='x', label='bandwidth')
             plt.yscale("log")
-            plt.ylabel('Length of Strings/Number of Bytes')
+            plt.ylabel('Number of Bytes Downloaded')
             plt.xlabel('Time in Seconds')
-            plt.title('Bandwidth Graph')
+            plt.title('Bandwidth Graph Log-Scaled')
             plt.grid()
             plt.savefig('bandwidth_logscale.png')
             plt.close()
