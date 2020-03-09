@@ -187,7 +187,7 @@ func removeDeadHead(pqPtr *PriorityQueue) {
 	}
 	headNodeNum := pq[0].value.TransactionId >> 56
 	fmt.Println("\nheadNodeNum 1:", headNodeNum)
-	for !nodeList[headNodeNum].isConnected {
+	for !nodeList[headNodeNum].isConnected && len(pq) != 0 {
 		fmt.Println("Sequencer for message at top of the queue died")
 		_ = heap.Pop(&pq).(*Item)
 		heap.Fix(&pq, 0)
@@ -207,6 +207,7 @@ func handleMessageChannel() {
 	}
 	for incoming := range localReceivingChannel {
 		removeDeadHead(&pq)
+
 		switch incomingMessage := incoming.(type) {
 		case BankMessage:
 			mPtr := new(BankMessage)
