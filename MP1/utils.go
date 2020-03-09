@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"time"
+	"unsafe"
 )
 
 // Performs our current error handling
@@ -61,4 +62,11 @@ func create_files() (*os.File, *os.File) {
 	fBandwidth, err := os.Create("bandwidth.txt")
 	check(err)
 	return fDelay, fBandwidth
+}
+
+// finds size of a BankMessage
+func (ptr *BankMessage) size() int {
+	size := int(unsafe.Sizeof(*ptr))
+	size += len(ptr.Transaction)
+	return size
 }

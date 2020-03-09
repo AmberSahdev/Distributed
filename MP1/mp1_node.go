@@ -299,6 +299,7 @@ func handleMessageChannel() {
 			} else {
 				// fmt.Println("Message Skipped 2:", mPtr)
 			}
+			filePointers[1].WriteString(fmt.Sprintf("%d ", (mPtr).size()))
 		case ConnUpdateMessage:
 			if incomingMessage.isConnected {
 				nodeList[incomingMessage.nodeNumber].openOutgoingConn()
@@ -310,6 +311,7 @@ func handleMessageChannel() {
 				fmt.Println("In ConnUpdateMessage:closeOutgoingConn")
 				nodeList[incomingMessage.nodeNumber].closeOutgoingConn()
 			}
+			filePointers[1].WriteString(fmt.Sprintf("%d ", 2)) // 2 bytes of data in ConnUpdateMessage
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "I don't know about type %T!\n", incomingMessage)
 		}
