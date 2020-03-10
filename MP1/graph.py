@@ -4,6 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_delay():
+    # Combine the log files, delayLogs_node0, delayLogs_node1, ...
+    # Plot the min and max delay for each transaction
+    # x axis = create time, y axis = first commit time - last commit time 
+
     # For the delay, for each second you should plot the
     # minimum, maximum, median, and 90th percentile delay at each second
     minList = []; maximumList = []; medianList = []; ninetiethPercentileList = [];
