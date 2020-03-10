@@ -1,12 +1,9 @@
-#   Delay from the time the event is generated to the time it shows up in the centralized logger
-#   The amount of bandwidth used by the centralized logger
 import numpy as np
 import matplotlib.pyplot as plt
 
-numNodes = 3
-case = "case1"
+numNodes = 8
+case = "case2"
 baseDir = "data/" + case
-
 
 def plot_delay():
     # Combine the log files, delayLogs_node0, delayLogs_node1, ...
@@ -53,6 +50,7 @@ def plot_delay():
     ax1.set_title('Delay Graph')
     plt.savefig(baseDir + '/delayLogs/delay_' + str(case) + '.png')
     plt.close()
+
 
 def plot_bandwidth():
     # for the bandwidth, you should track the average bandwidth across each second of the experiment.
