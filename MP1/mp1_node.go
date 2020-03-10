@@ -32,7 +32,7 @@ func (destNode *nodeComms) communicationTask() {
 		err := tcpEnc.Encode(m)
 		// fmt.Println("ENCODE m IN communicationTask:", m)
 		if err != nil {
-			fmt.Println("Failed to send Message, receiver down?")
+			fmt.Fprintln(os.Stderr, "Failed to send Message, receiver down?")
 			_ = destNode.conn.Close()
 			return
 		}
@@ -335,7 +335,7 @@ func handleMessageChannel() {
 			} else {
 				now := time.Now()
 				nanoseconds := float64(now.UnixNano()) / 1e9
-				fmt.Printf("\n%f - Node %d disconnected\n", nanoseconds, incomingMessage.nodeNumber)
+				fmt.Fprintf(os.Stderr, "\n%f - Node %d disconnected\n", nanoseconds, incomingMessage.nodeNumber)
 				// fmt.Println("In ConnUpdateMessage:closeOutgoingConn")
 				mPtr := new(BankMessage)
 				mPtr.SenderMessageNumber = nodeList[localNodeNum].senderMessageNum
