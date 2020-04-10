@@ -24,3 +24,7 @@ func max(x, y int64) int64 {
 	}
 	return y
 }
+
+func connect_to_node(ip_addr string, port string) nodeComm {
+
+}
