@@ -6,9 +6,11 @@ func (destNode *nodeComm) unicast(m TransactionMessage) {
 
 // Sends TransactionMessage to all our neighbors in neighborList
 func bMulticast(m TransactionMessage) {
+	/* // TODO: change to neighborMap
 	for _, node := range neighborList {
 		node.outbox <- m
 	}
+	*/
 }
 
 // Performs our current error handling
@@ -25,6 +27,8 @@ func max(x, y int64) int64 {
 	return y
 }
 
+/*
 func connect_to_node(ip_addr string, port string) nodeComm {
 
 }
+*/

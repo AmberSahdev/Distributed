@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
-	"strings"
 )
 
 const MAXNEIGHBORS = 50
@@ -31,17 +29,17 @@ var mp2_service_addr string
 
 func main() {
 	arguments := os.Args
-	if len(arguments) != 3 {
-		fmt.Println("Expected Format: ./gossip [Local Node Number] [ip_address:port]")
+	if len(arguments) != 4 {
+		fmt.Println("Expected Format: ./gossip [Local Node Name] [ip_address] [port]")
 		return
 	}
 
 	localNodeName = arguments[1]
-	localIPaddr = strings.Split(arguments[2], ":")[0]
-	localPort = strings.Split(arguments[2], ":")[1]
+	localIPaddr = arguments[2]
+	localPort = arguments[3]
 
 	localReceivingChannel = make(chan TransactionMessage, 65536)
-	mp2_service_addr = "" // TODO: fill it
+	mp2_service_addr = "localhost:2000" // TODO: fill it
 	neighborMap = make(map[string]*nodeComm)
 
 	listener := setup_incoming_tcp()
@@ -49,8 +47,9 @@ func main() {
 	go handle_service_comms()
 	/*
 		go listen_for_conns(listener)
-		go handle_incoming_messages()
+		go handle_incoming_messages(listener)
 	*/
+	go handle_incoming_messages(listener)
 
 	// open outgoing message thread
 	// go handle_outgoing_messages()
@@ -68,16 +67,18 @@ func setup_incoming_tcp() net.Listener {
 	return listener
 }
 
+/*
 func listen_for_conns(listener net.Listener) {
 	var conn net.Conn
 	var err error = nil
 	for err == nil {
 		conn, err = listener.Accept()
-		go receiveIncomingData(conn) // open up a go routine
+		// go receiveIncomingData(conn) // open up a go routine
 	}
 	_ = listener.Close()
 	panic("ERROR receiving incoming connections")
 }
+*/
 
 func connect_to_service() {
 	// Connect to mp2_service (over TCP)
@@ -89,37 +90,33 @@ func connect_to_service() {
 	mp2_service.outbox = nil // we dont need an outbox as we're only gonna be sending one message
 
 	mp2_service.conn, err = net.Dial("tcp", mp2_service.address)
+	check(err)
 
 	neighborMap["mp2_service"] = mp2_service
 }
 
 func handle_service_comms() {
 	mp2_service := neighborMap["mp2_service"]
-	tcpEnc := gob.NewEncoder(mp2_service.conn)
 	m := "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	err := tcpEnc.Encode(m)                                                      // sends m over TCP
-
+	_, err := mp2_service.conn.Write([]byte(m))                                  // sends m over TCP
+	check(err)
 	// handle messages
 	//    1.1 Upto 3 INTRODUCE
 	//    1.2 TRANSACTION messages
 	//    1.3 QUIT/DIE
-}
-
-func connect_to_initial_neighbors(initialIntroductionMessages []string) {
-	/*
-	   1. set up outgoing channels
-	   2. add to neighborList
-	*/
-	for m := range initialIntroductionMessages {
-		// parse m for ip_addr, port
-		node := connect_to_node(ip_addr, port)
-		neighborList.append(node)
-		numConns++
+	buf := make([]byte, 1024) // Make a buffer to hold incoming data
+	for {
+		// fmt.Println("DECODE m IN receiveIncomingData:", new_m)
+		len, err := mp2_service.conn.Read(buf)
+		check(err)
+		mp2_service_msg := string(buf[:len]) // strings.Split(string(buf[:len]), "\n")
+		print(mp2_service_msg)
+		// TODO: instead of printing, handle the messages
 	}
 }
 
 /**************************** Go Routines ****************************/
-func handle_incoming_messages() {
+func handle_incoming_messages(listener net.Listener) {
 	// setup incoming listener
 
 	// recieve incoming data
