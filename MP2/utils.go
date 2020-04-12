@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
+	"strings"
 )
 
 /*
@@ -69,4 +72,44 @@ func connect_to_node(node *nodeComm) {
 	fmt.Printf("connect_to_node \t type: %T\n", m)
 	err = tcpEnc.Encode(m)
 	check(err)
+}
+
+func (node *nodeComm) tcp_enc_struct(m Message) error {
+	//fmt.Println("tcp_enc_struct")
+	prefix := []uint8(reflect.TypeOf(m).String() + ":")
+	mJSON, err := json.Marshal(m)
+	check(err)
+	mJSON = append(prefix, mJSON...) // appending a slice to a slice
+	_, err = node.conn.Write([]byte(mJSON))
+	//check(err) // checked on callee-side
+	return err
+}
+
+func (node *nodeComm) tcp_dec_struct() (string, string) {
+	buf := make([]byte, 1024)
+	len, err := node.conn.Read(buf)
+	check(err)
+	mSlice := strings.SplitN(string(buf[:len]), ":", 2)
+	structType := mSlice[0]
+	structData := mSlice[1]
+	return structType, structData
+	/*
+		bytes := []byte(structData)
+		//var m *Message
+
+		if structType == "main.TransactionRequest" {
+			m := new(TransactionRequest)
+			err = json.Unmarshal(bytes, m)
+			fmt.Println("IN tcp_dec_struct m: ", m)
+			check(err)
+			return m
+		} else {
+			m := new(DiscoveryMessage)
+			m = nil
+			fmt.Println("\n ERROR ERROR ERROR tcp_dec_struct \n")
+			return m
+		}
+
+		return nil
+	*/
 }

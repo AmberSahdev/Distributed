@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -181,26 +181,34 @@ func (node *nodeComm) handle_outgoing_messages() {
 	//rand := time.Duration(rand.Intn(5)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	rand := time.Duration(0) // for stress test debugging purposes
 	for {
-		poll_for_transaction(node.conn)
+		node.poll_for_transaction()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
-		poll_for_neighbors(node.conn)
+		node.poll_for_neighbors()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
 }
 
-func poll_for_transaction(conn net.Conn) {
+func (node *nodeComm) poll_for_transaction() {
 	var TransactionIDs []string // empty TransactionIDs list, len() == 0
 	//m := new(TransactionRequest)
 	//m.Request = true
 	//m.TransactionIDs = TransactionIDs
 	m := TransactionRequest{true, TransactionIDs}
-	tcpEnc := gob.NewEncoder(conn)
+
+	//tcpEnc := gob.NewEncoder(conn)
+	//mJSON = struct_to_json(m)
+
 	fmt.Printf("poll_for_transaction \t type: %T\n", m)
-	err := tcpEnc.Encode(m)
+
+	//err := tcpEnc.Encode(m)
+	//err := json_over_tcp(mJSON)
+
+	err := node.tcp_enc_struct(m)
+
 	check(err)
 }
 
-func poll_for_neighbors(conn net.Conn) {
+func (node *nodeComm) poll_for_neighbors() {
 
 }
 
@@ -264,17 +272,47 @@ func (node *nodeComm) handle_node_comm() {
 }
 
 func (node *nodeComm) receive_incoming_data() {
-	tcpDec := gob.NewDecoder(node.conn)
-	/*
-		// would be ideal way to do this
-		for {
-			var m *Message
-			m = new(Message)
-			err := tcpDec.Decode(m)
+	for {
+		structType, structData := node.tcp_dec_struct()
+		Databytes := []byte(structData)
+
+		if structType == "main.TransactionRequest" {
+			m := new(TransactionRequest)
+			err := json.Unmarshal(Databytes, m)
 			check(err)
 			node.inbox <- *m
+			continue
+		} else {
+			m := new(DiscoveryMessage)
+			m = nil
+			fmt.Println("\n ERROR ERROR ERROR tcp_dec_struct \n")
+			node.inbox <- *m
+			continue
 		}
-	*/
+
+		// m := node.tcp_dec_struct()
+		// fmt.Println("m: ", m)
+		// fmt.Println("typeOf(m): ", reflect.TypeOf(m))
+		// fmt.Println("m.Request: ", m.Request)
+		// fmt.Println("m.TransactionIDs: ", m.TransactionIDs)
+
+		//fmt.Println("receive_incoming_data \t ", *m)
+		//node.inbox <- *m
+	}
+}
+
+//tcpDec := gob.NewDecoder(node.conn)
+/*
+	// would be ideal way to do this
+	for {
+		var m *Message
+		m = new(Message)
+		err := tcpDec.Decode(m)
+		check(err)
+		node.inbox <- *m
+	}
+*/
+/*
 	for {
 		var m *Message
 		m = new(Message)
@@ -286,79 +324,78 @@ func (node *nodeComm) receive_incoming_data() {
 		//fmt.Println(TransactionRequest(m))
 		node.inbox <- *m
 	}
-	/*
-		for {
-			var m Message
-			var err error
+*/
+/*
+	for {
+		var m Message
+		var err error
 
-			m = new(ConnectionMessage)
-			err = tcpDec.Decode(m)
-			if err == nil {
-				node.inbox <- m
-				continue
-			}
-
-			m = new(TransactionMessage)
-			err = tcpDec.Decode(m)
-			if err == nil {
-				node.inbox <- m
-				continue
-			}
-
-			m = new(DiscoveryMessage)
-			err = tcpDec.Decode(m)
-			if err == nil {
-				node.inbox <- m
-				continue
-			}
-
-			m = new(TransactionRequest)
-			err = tcpDec.Decode(m)
-			if err == nil {
-				node.inbox <- m
-				continue
-			}
-
-			// if you reached here
-			fmt.Println("Shouldn't have reached this code")
-			panic(err)
-
+		m = new(ConnectionMessage)
+		err = tcpDec.Decode(m)
+		if err == nil {
+			node.inbox <- m
+			continue
 		}
-	*/
-	/*
-		buf := make([]byte, 1024) // Make a buffer to hold incoming data
-		for {
 
-			len, err := node.conn.Read(buf)
-			check(err)
-			//m := strings.Split(string(buf[:len]), "\n")[0]
-			var obj TransactionRequest
-			m := buf[:len]
-			//b := []byte{0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40}
-			b := bytes.NewReader(m)
-			err = binary.Read(b, binary.LittleEndian, &obj)
-			if err != nil {
-				fmt.Println("NEW ERRORED ", err)
-			}
-			fmt.Println("obj: ", obj)
-	*/
-	/*
-		fmt.Println("m: ", m)
-		//fmt.Println("m: ", TransactionMessage(m))
-		err = nil
+		m = new(TransactionMessage)
+		err = tcpDec.Decode(m)
+		if err == nil {
+			node.inbox <- m
+			continue
+		}
 
+		m = new(DiscoveryMessage)
+		err = tcpDec.Decode(m)
+		if err == nil {
+			node.inbox <- m
+			continue
+		}
 
-		err = json.Unmarshal(m, &obj)
+		m = new(TransactionRequest)
+		err = tcpDec.Decode(m)
+		if err == nil {
+			node.inbox <- m
+			continue
+		}
 
+		// if you reached here
+		fmt.Println("Shouldn't have reached this code")
+		panic(err)
+
+	}
+*/
+/*
+	buf := make([]byte, 1024) // Make a buffer to hold incoming data
+	for {
+
+		len, err := node.conn.Read(buf)
+		check(err)
+		//m := strings.Split(string(buf[:len]), "\n")[0]
+		var obj TransactionRequest
+		m := buf[:len]
+		//b := []byte{0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40}
+		b := bytes.NewReader(m)
+		err = binary.Read(b, binary.LittleEndian, &obj)
 		if err != nil {
-			print("WE ERRORED ", err)
+			fmt.Println("NEW ERRORED ", err)
 		}
-		fmt.Println("obj:", obj)
-	*/
+		fmt.Println("obj: ", obj)
+*/
+/*
+	fmt.Println("m: ", m)
+	//fmt.Println("m: ", TransactionMessage(m))
+	err = nil
 
-	//obj. = m
-	//print("obj:", obj)
 
-	//}
+	err = json.Unmarshal(m, &obj)
 
-}
+	if err != nil {
+		print("WE ERRORED ", err)
+	}
+	fmt.Println("obj:", obj)
+*/
+
+//obj. = m
+//print("obj:", obj)
+
+//}
