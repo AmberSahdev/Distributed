@@ -44,8 +44,8 @@ func main() {
 
 	listener := setup_incoming_tcp()
 	connect_to_service()
-	//time.Sleep(5 * time.Second) // give service time to communicate
 	go handle_service_comms()
+	time.Sleep(5 * time.Second) // give service time to communicate
 
 	go listen_for_conns(listener)
 
@@ -89,6 +89,7 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 	node.nodeName = m.NodeName
 	node.address = m.IPaddr + ":" + m.Port
 	node.conn = conn
+	node.inbox = make(chan Message, 65536)
 	return node
 }
 
@@ -118,6 +119,7 @@ func handle_service_comms() {
 			neighborMap[node.nodeName] = node
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
+			node.inbox = make(chan Message, 65536)
 			connect_to_node(node)
 			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
@@ -216,11 +218,11 @@ func (node *nodeComm) handle_node_comm() {
 	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
 
-	tcpEnc := gob.NewEncoder(node.conn)
+	//tcpEnc := gob.NewEncoder(node.conn)
 	//tcpDec := gob.NewDecoder(node.conn)
 
 	for val := range node.inbox {
-		print("popping from node.inbox")
+		fmt.Println("popping from node.inbox")
 		switch m := val.(type) {
 		case ConnectionMessage:
 			print("ConnectionMessage")
@@ -238,15 +240,19 @@ func (node *nodeComm) handle_node_comm() {
 					TransactionIDs[i] = transaction.TransactionID
 				}
 				m = TransactionRequest{false, TransactionIDs}
+				//tcpEnc.Encode(m)
 				fmt.Printf("case TransactionRequest 1 \t type: %T\n", m)
-				tcpEnc.Encode(m)
+				err := node.tcp_enc_struct(m)
+				check(err)
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
 					i, _ := find_transaction(transactionList, transactionID)
 					fmt.Printf("case TransactionRequest 2 \t type: %T\n", m)
-					tcpEnc.Encode(*transactionList[i])
+					//tcpEnc.Encode(*transactionList[i])
+					err := node.tcp_enc_struct(*transactionList[i])
+					check(err)
 				}
 
 			} else if m.Request == false {
@@ -262,11 +268,13 @@ func (node *nodeComm) handle_node_comm() {
 
 				m = TransactionRequest{true, newtransactionIDs}
 				fmt.Printf("case TransactionRequest 3 \t type: %T\n", m)
-				tcpEnc.Encode(m)
+				//tcpEnc.Encode(m)
+				err := node.tcp_enc_struct(m)
+				check(err)
 			}
 
 		default:
-			print("Unknown Type")
+			panic("\n ERROR Unknown Type in handle_node_comm")
 		}
 	}
 }
@@ -274,128 +282,32 @@ func (node *nodeComm) handle_node_comm() {
 func (node *nodeComm) receive_incoming_data() {
 	for {
 		structType, structData := node.tcp_dec_struct()
+		fmt.Println("decoded in receive_incoming_data")
 		Databytes := []byte(structData)
 
-		if structType == "main.TransactionRequest" {
+		// NOTE: Couldn't put the following code in a function because functions needed concrete return types and interfaces weren't working
+		if structType == "main.ConnectionMessage" {
+			m := new(ConnectionMessage)
+			err := json.Unmarshal(Databytes, m)
+			check(err)
+			node.inbox <- *m
+		} else if structType == "main.TransactionMessage" {
+			m := new(TransactionMessage)
+			err := json.Unmarshal(Databytes, m)
+			check(err)
+			node.inbox <- *m
+		} else if structType == "main.DiscoveryMessage" {
+			m := new(DiscoveryMessage)
+			err := json.Unmarshal(Databytes, m)
+			check(err)
+			node.inbox <- *m
+		} else if structType == "main.TransactionRequest" {
 			m := new(TransactionRequest)
 			err := json.Unmarshal(Databytes, m)
 			check(err)
 			node.inbox <- *m
-			continue
 		} else {
-			m := new(DiscoveryMessage)
-			m = nil
-			fmt.Println("\n ERROR ERROR ERROR tcp_dec_struct \n")
-			node.inbox <- *m
-			continue
+			panic("\n ERROR receive_incoming_data type: " + structType)
 		}
-
-		// m := node.tcp_dec_struct()
-		// fmt.Println("m: ", m)
-		// fmt.Println("typeOf(m): ", reflect.TypeOf(m))
-		// fmt.Println("m.Request: ", m.Request)
-		// fmt.Println("m.TransactionIDs: ", m.TransactionIDs)
-
-		//fmt.Println("receive_incoming_data \t ", *m)
-		//node.inbox <- *m
 	}
 }
-
-//tcpDec := gob.NewDecoder(node.conn)
-/*
-	// would be ideal way to do this
-	for {
-		var m *Message
-		m = new(Message)
-		err := tcpDec.Decode(m)
-		check(err)
-		node.inbox <- *m
-	}
-*/
-/*
-	for {
-		var m *Message
-		m = new(Message)
-		err := tcpDec.Decode(m)
-		//check(err)
-		fmt.Println(err)
-		fmt.Println(*m)
-		fmt.Println(reflect.TypeOf(*m))
-		//fmt.Println(TransactionRequest(m))
-		node.inbox <- *m
-	}
-*/
-/*
-	for {
-		var m Message
-		var err error
-
-		m = new(ConnectionMessage)
-		err = tcpDec.Decode(m)
-		if err == nil {
-			node.inbox <- m
-			continue
-		}
-
-		m = new(TransactionMessage)
-		err = tcpDec.Decode(m)
-		if err == nil {
-			node.inbox <- m
-			continue
-		}
-
-		m = new(DiscoveryMessage)
-		err = tcpDec.Decode(m)
-		if err == nil {
-			node.inbox <- m
-			continue
-		}
-
-		m = new(TransactionRequest)
-		err = tcpDec.Decode(m)
-		if err == nil {
-			node.inbox <- m
-			continue
-		}
-
-		// if you reached here
-		fmt.Println("Shouldn't have reached this code")
-		panic(err)
-
-	}
-*/
-/*
-	buf := make([]byte, 1024) // Make a buffer to hold incoming data
-	for {
-
-		len, err := node.conn.Read(buf)
-		check(err)
-		//m := strings.Split(string(buf[:len]), "\n")[0]
-		var obj TransactionRequest
-		m := buf[:len]
-		//b := []byte{0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40}
-		b := bytes.NewReader(m)
-		err = binary.Read(b, binary.LittleEndian, &obj)
-		if err != nil {
-			fmt.Println("NEW ERRORED ", err)
-		}
-		fmt.Println("obj: ", obj)
-*/
-/*
-	fmt.Println("m: ", m)
-	//fmt.Println("m: ", TransactionMessage(m))
-	err = nil
-
-
-	err = json.Unmarshal(m, &obj)
-
-	if err != nil {
-		print("WE ERRORED ", err)
-	}
-	fmt.Println("obj:", obj)
-*/
-
-//obj. = m
-//print("obj:", obj)
-
-//}

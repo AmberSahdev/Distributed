@@ -93,23 +93,4 @@ func (node *nodeComm) tcp_dec_struct() (string, string) {
 	structType := mSlice[0]
 	structData := mSlice[1]
 	return structType, structData
-	/*
-		bytes := []byte(structData)
-		//var m *Message
-
-		if structType == "main.TransactionRequest" {
-			m := new(TransactionRequest)
-			err = json.Unmarshal(bytes, m)
-			fmt.Println("IN tcp_dec_struct m: ", m)
-			check(err)
-			return m
-		} else {
-			m := new(DiscoveryMessage)
-			m = nil
-			fmt.Println("\n ERROR ERROR ERROR tcp_dec_struct \n")
-			return m
-		}
-
-		return nil
-	*/
 }
