@@ -2,25 +2,29 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"net"
 )
 
+/*
 func (destNode *nodeComm) unicast(m TransactionMessage) {
 	destNode.outbox <- m
 }
 
 // Sends TransactionMessage to all our neighbors in neighborList
 func bMulticast(m TransactionMessage) {
-	/* // TODO: change to neighborMap
+	// TODO: change to neighborMap
 	for _, node := range neighborList {
 		node.outbox <- m
 	}
-	*/
+
 }
+*/
 
 // Performs our current error handling
 func check(e error) {
 	if e != nil {
+		fmt.Print("\n")
 		panic(e)
 	}
 }
@@ -32,10 +36,20 @@ func max(x, y int64) int64 {
 	return y
 }
 
+// Find takes a slice and looks for an element in it. If found it will
+// return it's key, otherwise it will return -1 and a bool of false.
+func find_transaction(slice []*TransactionMessage, val string) (int, bool) {
+	for i, item := range slice {
+		if item.TransactionID == val {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 func connect_to_node(node *nodeComm) {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
-	print("connect_to_node's node.address is ", node.address)
 	node.conn, err = net.Dial("tcp", node.address)
 	check(err) // TODO: maybe dont crash here
 

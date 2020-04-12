@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const MAXNEIGHBORS = 50
@@ -14,20 +16,13 @@ const POLLINGPERIOD = 10 // poll neighbors for their neighors every 10 seconds
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
 var numConns uint8                   // tracks number of other nodes connected to this node for bookkeeping
-var localReceivingChannel chan TransactionMessage
+var localReceivingChannel chan Message
 var localIPaddr string
 var localPort string
 
 var mp2ServiceAddr string
 
-/* TODO
-1. pull gossip
-  1.1 setup a incoming channel
-  1.2 send messages over TCP to service
-  1.3 poll for data (receive incoming data)
-  1.4 receive polls (send data)
-2.
-*/
+var transactionList []*TransactionMessage // List of TransactionMessage
 
 func main() {
 	arguments := os.Args
@@ -40,19 +35,17 @@ func main() {
 	localIPaddr = arguments[2]
 	localPort = arguments[3]
 
-	localReceivingChannel = make(chan TransactionMessage, 65536)
+	localReceivingChannel = make(chan Message, 65536)
 	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
 	neighborMap = make(map[string]*nodeComm)
+	//transactionMap = make(map[string]*TransactionMessage)
+	// transactionList = make([]*TransactionMessage, 2000)
 
 	listener := setup_incoming_tcp()
 	connect_to_service()
 	go handle_service_comms()
 
 	go listen_for_conns(listener)
-	//go handle_incoming_messages(listener)
-
-	// open outgoing message thread
-	// go handle_outgoing_messages()
 
 	// handle the ever updating list of transactions (do any kind of reordering, maintenance work here)
 	go blockchain()
@@ -74,7 +67,7 @@ func connect_to_service() {
 
 	mp2Service.nodeName = "mp2Service"
 	mp2Service.address = mp2ServiceAddr
-	mp2Service.outbox = nil // dont need an outbox because only sending 1 message
+	mp2Service.inbox = nil
 
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
@@ -84,9 +77,9 @@ func connect_to_service() {
 
 func setup_neighbor(conn net.Conn) *nodeComm {
 	// Called when a neighbor is trying to connect to this node
-	tcpDecode := gob.NewDecoder(conn)
+	tcpDec := gob.NewDecoder(conn)
 	m := new(ConnectionMessage)
-	err := tcpDecode.Decode(m)
+	err := tcpDec.Decode(m)
 	check(err)
 
 	node := new(nodeComm)
@@ -123,9 +116,18 @@ func handle_service_comms() {
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
 			connect_to_node(node)
-
+			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
-			//println(mp2ServiceMsg)
+			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
+			transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
+			transactionID := strings.Split(mp2ServiceMsg, " ")[2]
+			transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
+			transactionDest, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[4])
+			transactionAmt, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[5])
+			transaction := new(TransactionMessage)
+			*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
+
+			transactionList = append(transactionList, transaction) // TODO: make this more efficient
 		} else if (msgType == "QUIT") || (msgType == "DIE") {
 
 		}
@@ -138,31 +140,123 @@ func listen_for_conns(listener net.Listener) {
 	for err == nil {
 		conn, err = listener.Accept()
 		node := setup_neighbor(conn)
-		go node.handle_incoming_messages() // open up a go routine
+		go node.handle_node_comm() // open up a go routine
 	}
 	_ = listener.Close()
 	panic("ERROR receiving incoming connections")
 }
 
 func (node *nodeComm) handle_incoming_messages() {
-	print("\nSuccesfully connected to node ", node.nodeName)
+	print("\nSuccesfully connected to ", node.nodeName)
 	for {
 
 	}
-
 	// recieve incoming data
-	//    - list of neighbor's neighbors
-	//    - receiving pull request for transactions from neighbors
+	//		- receiving poll request for transactionIDs from neighbors (POLL:TRANSACTION_IDs)
+	//    - receiving pull request for specific transactions from neighbors (PULL:transactionID1,transactionID2,...)
 	//    - receiving transactions from neighbors
+	//				series of two messages:
+	//					- TRANSACTION:num_transactions
+	//					- a list of size num_transactions of data type TransactionMessage
+	//
+	//    - receiving poll request for this node's neighbors (POLL:NEIGHBORS)
+	//    - list of neighbor's neighbors (as a string of type NEIGHBORS:num_neighbors)
+	//				series of two messages:
+	//					-	string in format NEIGHBORS:num_neighbors
+	//					-	list of size num_neighbors of data type ConnectionMessage
 
 }
 
 func (node *nodeComm) handle_outgoing_messages() {
 	//   one per NodeComm
-	//   open an outgoing connection
+	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
 	//   handle messages of the following type:
-	//     - ask neighbor for its neighbors
+	//		 - poll neighbor for transactions (POLL:TRANSACTION_IDs)
 	//     - send pull request
 	//     - send transactions upon a pull request
+	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
+	for {
+		poll_for_transaction(node.conn)
+		time.Sleep(POLLINGPERIOD * time.Second)
+		poll_for_neighbors(node.conn)
+		time.Sleep(POLLINGPERIOD * time.Second)
+	}
+}
 
+func poll_for_transaction(conn net.Conn) {
+	var TransactionIDs []string // empty TransactionIDs list, len() == 0
+	m := TransactionRequest{true, TransactionIDs}
+	tcpEnc := gob.NewEncoder(conn)
+	err := tcpEnc.Encode(m)
+	check(err)
+}
+
+func poll_for_neighbors(conn net.Conn) {
+
+}
+
+func (node *nodeComm) handle_node_comm() {
+	go node.handle_outgoing_messages()
+	go node.receive_incoming_data() // put messages of this conn into node.inbox
+
+	tcpEnc := gob.NewEncoder(node.conn)
+	//tcpDec := gob.NewDecoder(node.conn)
+
+	for val := range node.inbox {
+		switch m := val.(type) {
+		case ConnectionMessage:
+			print("ConnectionMessage")
+		case TransactionMessage:
+			print("TransactionMessage")
+		case DiscoveryMessage:
+			print("DiscoveryMessage")
+		case TransactionRequest:
+			print("TransactionRequest")
+			if m.Request == true && len(m.TransactionIDs) == 0 {
+				// send all your TransactionIDs TODO: send only new transactionIDs (keep track of last sent index)
+				TransactionIDs := make([]string, len(transactionList)) // //var TransactionIDs []string
+
+				for i, transaction := range transactionList {
+					TransactionIDs[i] = transaction.TransactionID
+				}
+				m = TransactionRequest{false, TransactionIDs}
+				tcpEnc.Encode(m)
+
+			} else if m.Request == true && len(m.TransactionIDs) != 0 {
+				// send requested TransactionIDs's corresponding TransactionMessage
+				for _, transactionID := range m.TransactionIDs {
+					i, _ := find_transaction(transactionList, transactionID)
+					tcpEnc.Encode(*transactionList[i])
+				}
+
+			} else if m.Request == false {
+				// you have received list of transactionIDs other node has
+				// check if you have the sent TransactionIDs TODO: make it faster by making it dict
+				var newtransactionIDs []string
+				for _, transactionID := range m.TransactionIDs {
+					_, exists := find_transaction(transactionList, transactionID)
+					if !exists {
+						newtransactionIDs = append(newtransactionIDs, transactionID)
+					}
+				}
+
+				m = TransactionRequest{true, newtransactionIDs}
+				tcpEnc.Encode(m)
+			}
+
+		default:
+			print("Unknown Type")
+		}
+	}
+}
+
+func (node *nodeComm) receive_incoming_data() {
+	tcpDec := gob.NewDecoder(node.conn)
+	for {
+		var m *Message
+		m = new(Message)
+		err := tcpDec.Decode(m)
+		check(err)
+		node.inbox <- *m
+	}
 }
