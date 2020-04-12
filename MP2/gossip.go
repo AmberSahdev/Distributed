@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -189,6 +190,9 @@ func (node *nodeComm) handle_outgoing_messages() {
 
 func poll_for_transaction(conn net.Conn) {
 	var TransactionIDs []string // empty TransactionIDs list, len() == 0
+	//m := new(TransactionRequest)
+	//m.Request = true
+	//m.TransactionIDs = TransactionIDs
 	m := TransactionRequest{true, TransactionIDs}
 	tcpEnc := gob.NewEncoder(conn)
 	fmt.Printf("poll_for_transaction \t type: %T\n", m)
@@ -208,6 +212,7 @@ func (node *nodeComm) handle_node_comm() {
 	//tcpDec := gob.NewDecoder(node.conn)
 
 	for val := range node.inbox {
+		print("popping from node.inbox")
 		switch m := val.(type) {
 		case ConnectionMessage:
 			print("ConnectionMessage")
@@ -260,26 +265,100 @@ func (node *nodeComm) handle_node_comm() {
 
 func (node *nodeComm) receive_incoming_data() {
 	tcpDec := gob.NewDecoder(node.conn)
-	// ideal way to do this
+	/*
+		// would be ideal way to do this
+		for {
+			var m *Message
+			m = new(Message)
+			err := tcpDec.Decode(m)
+			check(err)
+			node.inbox <- *m
+		}
+	*/
 	for {
 		var m *Message
 		m = new(Message)
 		err := tcpDec.Decode(m)
-		check(err)
+		//check(err)
+		fmt.Println(err)
+		fmt.Println(*m)
+		fmt.Println(reflect.TypeOf(*m))
+		//fmt.Println(TransactionRequest(m))
 		node.inbox <- *m
 	}
-
 	/*
 		for {
 			var m Message
+			var err error
+
 			m = new(ConnectionMessage)
-			err := tcpDec.Decode(m)
+			err = tcpDec.Decode(m)
 			if err == nil {
 				node.inbox <- m
 				continue
 			}
 
+			m = new(TransactionMessage)
+			err = tcpDec.Decode(m)
+			if err == nil {
+				node.inbox <- m
+				continue
+			}
+
+			m = new(DiscoveryMessage)
+			err = tcpDec.Decode(m)
+			if err == nil {
+				node.inbox <- m
+				continue
+			}
+
+			m = new(TransactionRequest)
+			err = tcpDec.Decode(m)
+			if err == nil {
+				node.inbox <- m
+				continue
+			}
+
+			// if you reached here
+			fmt.Println("Shouldn't have reached this code")
+			panic(err)
+
 		}
 	*/
+	/*
+		buf := make([]byte, 1024) // Make a buffer to hold incoming data
+		for {
+
+			len, err := node.conn.Read(buf)
+			check(err)
+			//m := strings.Split(string(buf[:len]), "\n")[0]
+			var obj TransactionRequest
+			m := buf[:len]
+			//b := []byte{0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40}
+			b := bytes.NewReader(m)
+			err = binary.Read(b, binary.LittleEndian, &obj)
+			if err != nil {
+				fmt.Println("NEW ERRORED ", err)
+			}
+			fmt.Println("obj: ", obj)
+	*/
+	/*
+		fmt.Println("m: ", m)
+		//fmt.Println("m: ", TransactionMessage(m))
+		err = nil
+
+
+		err = json.Unmarshal(m, &obj)
+
+		if err != nil {
+			print("WE ERRORED ", err)
+		}
+		fmt.Println("obj:", obj)
+	*/
+
+	//obj. = m
+	//print("obj:", obj)
+
+	//}
 
 }
