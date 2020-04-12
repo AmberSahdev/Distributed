@@ -43,6 +43,7 @@ func main() {
 
 	listener := setup_incoming_tcp()
 	connect_to_service()
+	//time.Sleep(5 * time.Second) // give service time to communicate
 	go handle_service_comms()
 
 	go listen_for_conns(listener)
@@ -94,7 +95,8 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 func handle_service_comms() {
 	mp2Service := neighborMap["mp2Service"]
 	m := "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	_, err := mp2Service.conn.Write([]byte(m))                                   // sends m over TCP
+	fmt.Printf("handle_service_comms \t type: %T\n", m)
+	_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
 	check(err)
 
 	// handle messages
@@ -110,7 +112,7 @@ func handle_service_comms() {
 		msgType := strings.Split(mp2ServiceMsg, " ")[0]
 		if msgType == "INTRODUCE" {
 			// Example: INTRODUCE node2 172.22.156.3 4567
-			print(mp2ServiceMsg)
+			print(mp2ServiceMsg, "\n")
 			node := new(nodeComm)
 			neighborMap[node.nodeName] = node
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
@@ -175,11 +177,13 @@ func (node *nodeComm) handle_outgoing_messages() {
 	//     - send pull request
 	//     - send transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
+	//rand := time.Duration(rand.Intn(5)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+	rand := time.Duration(0) // for stress test debugging purposes
 	for {
 		poll_for_transaction(node.conn)
-		time.Sleep(POLLINGPERIOD * time.Second)
+		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 		poll_for_neighbors(node.conn)
-		time.Sleep(POLLINGPERIOD * time.Second)
+		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
 }
 
@@ -187,6 +191,7 @@ func poll_for_transaction(conn net.Conn) {
 	var TransactionIDs []string // empty TransactionIDs list, len() == 0
 	m := TransactionRequest{true, TransactionIDs}
 	tcpEnc := gob.NewEncoder(conn)
+	fmt.Printf("poll_for_transaction \t type: %T\n", m)
 	err := tcpEnc.Encode(m)
 	check(err)
 }
@@ -220,12 +225,14 @@ func (node *nodeComm) handle_node_comm() {
 					TransactionIDs[i] = transaction.TransactionID
 				}
 				m = TransactionRequest{false, TransactionIDs}
+				fmt.Printf("case TransactionRequest 1 \t type: %T\n", m)
 				tcpEnc.Encode(m)
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
 					i, _ := find_transaction(transactionList, transactionID)
+					fmt.Printf("case TransactionRequest 2 \t type: %T\n", m)
 					tcpEnc.Encode(*transactionList[i])
 				}
 
@@ -241,6 +248,7 @@ func (node *nodeComm) handle_node_comm() {
 				}
 
 				m = TransactionRequest{true, newtransactionIDs}
+				fmt.Printf("case TransactionRequest 3 \t type: %T\n", m)
 				tcpEnc.Encode(m)
 			}
 
@@ -252,6 +260,7 @@ func (node *nodeComm) handle_node_comm() {
 
 func (node *nodeComm) receive_incoming_data() {
 	tcpDec := gob.NewDecoder(node.conn)
+	// ideal way to do this
 	for {
 		var m *Message
 		m = new(Message)
@@ -259,4 +268,18 @@ func (node *nodeComm) receive_incoming_data() {
 		check(err)
 		node.inbox <- *m
 	}
+
+	/*
+		for {
+			var m Message
+			m = new(ConnectionMessage)
+			err := tcpDec.Decode(m)
+			if err == nil {
+				node.inbox <- m
+				continue
+			}
+
+		}
+	*/
+
 }

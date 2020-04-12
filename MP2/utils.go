@@ -66,6 +66,7 @@ func connect_to_node(node *nodeComm) {
 		IPaddr:   localIPaddr,
 		Port:     localPort,
 	}
+	fmt.Printf("connect_to_node \t type: %T\n", m)
 	err = tcpEnc.Encode(m)
 	check(err)
 }
