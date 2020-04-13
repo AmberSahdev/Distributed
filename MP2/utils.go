@@ -47,7 +47,7 @@ func connect_to_node(node *nodeComm) {
 		IPaddr:   localIPaddr,
 		Port:     localPort,
 	}
-	fmt.Printf("connect_to_node \t type: %T\n", m)
+	fmt.Printf("connect_to_node \t type: %T\n\n", m)
 	err = tcpEnc.Encode(m)
 	check(err)
 }
@@ -55,20 +55,49 @@ func connect_to_node(node *nodeComm) {
 func (node *nodeComm) tcp_enc_struct(m Message) error {
 	//fmt.Println("tcp_enc_struct")
 	prefix := []uint8(reflect.TypeOf(m).String() + ":")
+	//fmt.Println("\t Sending ", string(prefix))
 	mJSON, err := json.Marshal(m)
 	check(err)
 	mJSON = append(prefix, mJSON...) // appending a slice to a slice
+
 	_, err = node.conn.Write([]byte(mJSON))
+	fmt.Println("\t sent ", string(mJSON))
 	//check(err) // checked on callee-side
 	return err
 }
 
+/*
 func (node *nodeComm) tcp_dec_struct() (string, string) {
 	buf := make([]byte, 1024)
 	len, err := node.conn.Read(buf)
+	fmt.Println(string(buf[:len]))
 	check(err)
 	mSlice := strings.SplitN(string(buf[:len]), ":", 2)
 	structType := mSlice[0]
 	structData := mSlice[1]
 	return structType, structData
+}
+*/
+
+func (node *nodeComm) tcp_dec_struct() ([]string, []string) {
+	buf := make([]byte, 1024)
+	l, err := node.conn.Read(buf)
+	check(err)
+
+	fmt.Println("Received the following on decoding side: ", string(buf[:l]))
+
+	// have to do this because TCP sometimes coalesces messages
+	ListOfMessages := strings.Split(string(buf[:l]), "}")
+	numMessages := len(ListOfMessages) - 1
+
+	retStructType := make([]string, numMessages)
+	retstructData := make([]string, numMessages)
+
+	for i := 0; i < numMessages; i++ {
+		message := ListOfMessages[i]
+		mSlice := strings.SplitN(string(message), ":", 2)
+		retStructType[i] = mSlice[0]
+		retstructData[i] = mSlice[1] + "}"
+	}
+	return retStructType, retstructData
 }

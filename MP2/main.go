@@ -15,13 +15,12 @@ const POLLINGPERIOD = 10 // poll neighbors for their neighors every 10 seconds
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
 var numConns uint8                   // tracks number of other nodes connected to this node for bookkeeping
-var localReceivingChannel chan Message
 var localIPaddr string
 var localPort string
 
 var mp2ServiceAddr string
 
-var transactionList []*TransactionMessage // List of TransactionMessage
+var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
 
 func main() {
 	arguments := os.Args
@@ -34,7 +33,6 @@ func main() {
 	localIPaddr = arguments[2]
 	localPort = arguments[3]
 
-	localReceivingChannel = make(chan Message, 65536)
 	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
 	neighborMap = make(map[string]*nodeComm)
 	//transactionMap = make(map[string]*TransactionMessage)
@@ -106,6 +104,7 @@ func handle_service_comms() {
 			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
 			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
+			fmt.Println("received mp2_service transaction")
 			transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
 			transactionID := strings.Split(mp2ServiceMsg, " ")[2]
 			transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
