@@ -79,16 +79,19 @@ func (node *nodeComm) tcp_dec_struct() (string, string) {
 }
 */
 
-func (node *nodeComm) tcp_dec_struct() ([]string, []string) {
+func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, string) {
 	buf := make([]byte, 1024)
 	l, err := node.conn.Read(buf)
 	check(err)
 
-	fmt.Println("Received the following on decoding side: ", string(buf[:l]))
+	fmt.Println("\nReceived the following on decoding side: ", string(buf[:l]))
+	fmt.Println("\nWith overflowData: ", overflowData+string(buf[:l]))
 
 	// have to do this because TCP sometimes coalesces messages
-	ListOfMessages := strings.Split(string(buf[:l]), "}")
+	ListOfMessages := strings.Split(overflowData+string(buf[:l]), "}")
+
 	numMessages := len(ListOfMessages) - 1
+	fmt.Println("\n numMessages ", numMessages)
 
 	retStructType := make([]string, numMessages)
 	retstructData := make([]string, numMessages)
@@ -99,5 +102,10 @@ func (node *nodeComm) tcp_dec_struct() ([]string, []string) {
 		retStructType[i] = mSlice[0]
 		retstructData[i] = mSlice[1] + "}"
 	}
-	return retStructType, retstructData
+
+	overflowData = ListOfMessages[numMessages] // the last index (the trailing data that wasn't a part of a complete struct)
+
+	fmt.Println("\n retStructType ", retStructType)
+	fmt.Println("\n retstructData ", retstructData)
+	return retStructType, retstructData, overflowData
 }

@@ -73,7 +73,7 @@ func (node *nodeComm) handle_node_comm() {
 		case ConnectionMessage:
 			println("ConnectionMessage")
 		case TransactionMessage:
-			println("TransactionMessage")
+			println("handle_node_comm TransactionMessage")
 		case DiscoveryMessage:
 			println("DiscoveryMessage")
 		case TransactionRequest:
@@ -132,8 +132,12 @@ func (node *nodeComm) handle_node_comm() {
 
 func (node *nodeComm) receive_incoming_data() {
 	// handles incoming data from other nodes (not mp2_service)
+	overflowData := ""
+	var structDataList []string
+	var structTypeList []string
 	for {
-		structTypeList, structDataList := node.tcp_dec_struct()
+		structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
+		//overflowData = ""
 		//fmt.Println("decoded in receive_incoming_data")
 		//structDatabytes := []byte(structData)
 
@@ -167,6 +171,9 @@ func (node *nodeComm) receive_incoming_data() {
 				check(err)
 				node.inbox <- *m
 
+			} else if i == len(structTypeList)-1 {
+				overflowData = structType
+				fmt.Println("ALERT overflowData in structType: ", overflowData)
 			} else {
 				panic("\n ERROR receive_incoming_data type: " + structType)
 			}
