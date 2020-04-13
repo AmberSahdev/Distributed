@@ -17,7 +17,7 @@ func check(e error) {
 	}
 }
 
-func max(x, y int64) int64 {
+func max(x, y int) int {
 	if x > y {
 		return x
 	}
