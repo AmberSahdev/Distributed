@@ -53,45 +53,39 @@ func connect_to_node(node *nodeComm) {
 }
 
 func (node *nodeComm) tcp_enc_struct(m Message) error {
-	//fmt.Println("tcp_enc_struct")
+	// Send a struct over TCP node.Conn() using JSON encoding with the prefix of struct's name
 	prefix := []uint8(reflect.TypeOf(m).String() + ":")
-	//fmt.Println("\t Sending ", string(prefix))
 	mJSON, err := json.Marshal(m)
 	check(err)
 	mJSON = append(prefix, mJSON...) // appending a slice to a slice
 
 	_, err = node.conn.Write([]byte(mJSON))
-	fmt.Println("\t sent ", string(mJSON))
+	//fmt.Println("\t sent ", string(mJSON))
 	//check(err) // checked on callee-side
 	return err
 }
 
-/*
-func (node *nodeComm) tcp_dec_struct() (string, string) {
-	buf := make([]byte, 1024)
-	len, err := node.conn.Read(buf)
-	fmt.Println(string(buf[:len]))
-	check(err)
-	mSlice := strings.SplitN(string(buf[:len]), ":", 2)
-	structType := mSlice[0]
-	structData := mSlice[1]
-	return structType, structData
-}
-*/
-
 func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, string) {
+	/*
+		Receive data over TCP node.Conn() using JSON encoding as detailed in tcp_enc_struct()
+		Input:
+			overflowData: data that wasn't a part of a complete struct the last time this function was called
+		Output:
+			retStructType: a list of struct names, index corresponds to the corresponding struct data in retstructData
+			retstructData: list of data in Json format, corresponds to the struct at corresponding index of retStructType
+			overflowData: data that was not a part of a complete struct on this conn.Read(). Feed it back in on the next call
+	*/
 	buf := make([]byte, 1024)
 	l, err := node.conn.Read(buf)
 	check(err)
 
-	fmt.Println("\nReceived the following on decoding side: ", string(buf[:l]))
-	fmt.Println("\nWith overflowData: ", overflowData+string(buf[:l]))
+	//fmt.Println("\nReceived the following on decoding side with overflowData: ", overflowData+string(buf[:l]))
 
-	// have to do this because TCP sometimes coalesces messages
+	// have to do this because TCP coalesces messages
 	ListOfMessages := strings.Split(overflowData+string(buf[:l]), "}")
 
 	numMessages := len(ListOfMessages) - 1
-	fmt.Println("\n numMessages ", numMessages)
+	//fmt.Println("\n numMessages ", numMessages)
 
 	retStructType := make([]string, numMessages)
 	retstructData := make([]string, numMessages)
@@ -105,7 +99,7 @@ func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, s
 
 	overflowData = ListOfMessages[numMessages] // the last index (the trailing data that wasn't a part of a complete struct)
 
-	fmt.Println("\n retStructType ", retStructType)
-	fmt.Println("\n retstructData ", retstructData)
+	//fmt.Println("\n retStructType ", retStructType)
+	//fmt.Println("\n retstructData ", retstructData)
 	return retStructType, retstructData, overflowData
 }

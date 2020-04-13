@@ -104,7 +104,7 @@ func handle_service_comms() {
 			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
 			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
-			fmt.Println("received mp2_service transaction")
+			//fmt.Println("received mp2_service transaction")
 			transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
 			transactionID := strings.Split(mp2ServiceMsg, " ")[2]
 			transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
