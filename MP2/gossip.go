@@ -42,6 +42,13 @@ func (node *nodeComm) handle_outgoing_messages() {
 	for {
 		node.poll_for_transaction()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
+
+		// print transactions for debugging and verification purposes
+		fmt.Println("\n")
+		for _, val := range transactionMap {
+			fmt.Println(*val)
+		}
+
 		node.poll_for_neighbors()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
@@ -49,44 +56,77 @@ func (node *nodeComm) handle_outgoing_messages() {
 
 func (node *nodeComm) poll_for_transaction() {
 	// when called, asks node.conn neighbor about the transaction IDs it has
-	//var TransactionIDs []string // empty TransactionIDs list, len() == 0
 	TransactionIDs := make([]string, 0)
 	m := TransactionRequest{true, TransactionIDs}
-	//fmt.Printf("sent poll_for_transaction \t type: %T\n", m)
 	err := node.tcp_enc_struct(m)
 	check(err)
 }
 
 func (node *nodeComm) poll_for_neighbors() {
 	// when called, ask neighbors about their neghbors
-	// TODO:
+	m := DiscoveryMessage{true}
+	err := node.tcp_enc_struct(m)
+	check(err)
 }
 
 func (node *nodeComm) handle_node_comm() {
+	fmt.Println("Start handle_node_comm for ", node.nodeName)
 	// handles all logic for communication between nodes
 	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
 
+	lastSentTransactionIndex := 0 // to send only new transactionIDs, need to keep track of last sent index
+
 	for val := range node.inbox {
-		//fmt.Println("popping from node.inbox")
 		switch m := val.(type) {
 		case ConnectionMessage:
-			println("handle_node_comm ConnectionMessage")
-		case TransactionMessage:
-			println("handle_node_comm TransactionMessage")
-		case DiscoveryMessage:
-			println("handle_node_comm DiscoveryMessage")
-		case TransactionRequest:
-			//println("handle_node_comm TransactionRequest")
-			if m.Request == true && len(m.TransactionIDs) == 0 {
-				// send all your TransactionIDs TODO: send only new transactionIDs (keep track of last sent index)
-				TransactionIDs := make([]string, len(transactionList))
+			if _, exists := neighborMap[m.NodeName]; !exists {
+				newNode := new(nodeComm)
+				newNode.nodeName = m.NodeName
+				newNode.address = m.IPaddr + ":" + m.Port
+				newNode.inbox = make(chan Message, 65536)
+				neighborMap[newNode.nodeName] = newNode
+				connect_to_node(newNode)
+				go newNode.handle_node_comm()
+			}
 
-				for i, transaction := range transactionList {
-					TransactionIDs[i] = transaction.TransactionID
+		case TransactionMessage:
+			add_transaction(m)
+
+		case DiscoveryMessage:
+			if m.Request {
+				// send 5 random neighbors (first 5 neighbors)
+				numNeighborsSend := min(5, len(neighborMap))
+				i := 0
+				for k, v := range neighborMap {
+					if k == "mp2Service" || k == localNodeName || k == node.nodeName {
+						continue
+					} else if i == numNeighborsSend {
+						break
+					}
+					newMsg := *nodeComm_to_ConnectionMessage(v)
+					err := node.tcp_enc_struct(newMsg)
+					check(err)
+					i++
 				}
+			} else {
+				panic("ERROR received DiscoveryMessage with request false")
+			}
+
+		case TransactionRequest:
+			if m.Request == true && len(m.TransactionIDs) == 0 {
+				// send all your TransactionIDs
+				l := max(0, len(transactionList)-lastSentTransactionIndex)
+				TransactionIDs := make([]string, l)
+
+				j := 0
+				for i := lastSentTransactionIndex; i < len(transactionList); i++ {
+					TransactionIDs[j] = transactionList[i].TransactionID
+					j++
+				}
+
 				msg := TransactionRequest{false, TransactionIDs}
-				//fmt.Println("sending handle_node_comm -> TransactionRequest 1 : ")
+
 				err := node.tcp_enc_struct(msg)
 
 				check(err)
@@ -94,31 +134,29 @@ func (node *nodeComm) handle_node_comm() {
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
-					i, _ := find_transaction(transactionList, transactionID)
-					//fmt.Printf("case TransactionRequest 2 \t type: %T\n", m)
-					//fmt.Println("sending handle_node_comm -> TransactionRequest 2 : ")
-					err := node.tcp_enc_struct(*transactionList[i])
-
-					check(err)
+					exists, transactionPtr := find_transaction(transactionID)
+					if exists {
+						err := node.tcp_enc_struct(*transactionPtr)
+						check(err)
+					} else {
+						panic("ERROR You should not receive request for a transactionID that you do not have")
+					}
 				}
 
 			} else if m.Request == false {
 				// you have received list of transactionIDs other node has
-				// check if you have the sent TransactionIDs (TODO: make it faster by making it dict)
+				// check if you have the received TransactionIDs
 				if len(m.TransactionIDs) != 0 {
 					var newtransactionIDs []string
 					for _, transactionID := range m.TransactionIDs {
-						_, exists := find_transaction(transactionList, transactionID)
+						exists, _ := find_transaction(transactionID)
 						if !exists {
 							newtransactionIDs = append(newtransactionIDs, transactionID)
 						}
 					}
 
 					msg := TransactionRequest{true, newtransactionIDs}
-					//fmt.Printf("case TransactionRequest 3 \t type: %T\n", m)
-					//fmt.Println("sending handle_node_comm -> TransactionRequest 3 : ")
 					err := node.tcp_enc_struct(msg)
-
 					check(err)
 				}
 			}

@@ -17,22 +17,18 @@ func check(e error) {
 	}
 }
 
-func max(x, y int64) int64 {
+func max(x, y int) int {
 	if x > y {
 		return x
 	}
 	return y
 }
 
-// Find takes a slice and looks for an element in it. If found it will
-// return it's key, otherwise it will return -1 and a bool of false.
-func find_transaction(slice []*TransactionMessage, val string) (int, bool) {
-	for i, item := range slice {
-		if item.TransactionID == val {
-			return i, true
-		}
+func min(x, y int) int {
+	if x > y {
+		return y
 	}
-	return -1, false
+	return x
 }
 
 func connect_to_node(node *nodeComm) {
@@ -47,7 +43,7 @@ func connect_to_node(node *nodeComm) {
 		IPaddr:   localIPaddr,
 		Port:     localPort,
 	}
-	fmt.Printf("connect_to_node \t type: %T\n\n", m)
+	// fmt.Println("connect_to_node \t ", m)
 	err = tcpEnc.Encode(m)
 	check(err)
 }
@@ -102,4 +98,29 @@ func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, s
 	//fmt.Println("\n retStructType ", retStructType)
 	//fmt.Println("\n retstructData ", retstructData)
 	return retStructType, retstructData, overflowData
+}
+
+func add_transaction(m TransactionMessage) {
+	newM := new(TransactionMessage)
+	*newM = m
+	transactionList = append(transactionList, newM) // TODO: make it more efficient
+	transactionMap[m.TransactionID] = newM
+}
+
+// Find takes a slice and looks for an element in it. If found it will
+// return it's key, otherwise it will return -1 and a bool of false.
+func find_transaction(key string) (bool, *TransactionMessage) {
+	if val, exists := transactionMap[key]; exists {
+		return true, val
+	} else {
+		return false, nil
+	}
+}
+
+func nodeComm_to_ConnectionMessage(nodePtr *nodeComm) *ConnectionMessage {
+	ret := new(ConnectionMessage)
+	ret.NodeName = nodePtr.nodeName
+	ret.IPaddr = strings.Split(nodePtr.address, ":")[0]
+	ret.Port = strings.Split(nodePtr.address, ":")[1]
+	return ret
 }

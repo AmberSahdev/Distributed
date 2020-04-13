@@ -10,7 +10,7 @@ import (
 )
 
 const MAXNEIGHBORS = 50
-const POLLINGPERIOD = 10 // poll neighbors for their neighors every 10 seconds
+const POLLINGPERIOD = 10 // poll neighbors for their neighors, transactions every POLLINGPERIOD*2 seconds
 
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
@@ -21,6 +21,7 @@ var localPort string
 var mp2ServiceAddr string
 
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
+var transactionMap map[string]*TransactionMessage
 
 func main() {
 	arguments := os.Args
@@ -34,9 +35,9 @@ func main() {
 	localPort = arguments[3]
 
 	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
+	transactionMap = make(map[string]*TransactionMessage)
 	neighborMap = make(map[string]*nodeComm)
-	//transactionMap = make(map[string]*TransactionMessage)
-	// transactionList = make([]*TransactionMessage, 2000)
+	neighborMap[localNodeName] = nil // To avoid future errors
 
 	listener := setup_incoming_tcp()
 	connect_to_service()
@@ -96,11 +97,11 @@ func handle_service_comms() {
 			// Example: INTRODUCE node2 172.22.156.3 4567
 			print(mp2ServiceMsg, "\n")
 			node := new(nodeComm)
-			neighborMap[node.nodeName] = node
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
 			node.inbox = make(chan Message, 65536)
 			connect_to_node(node)
+			neighborMap[node.nodeName] = node
 			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
 			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
@@ -112,8 +113,7 @@ func handle_service_comms() {
 			transactionAmt, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[5])
 			transaction := new(TransactionMessage)
 			*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
-
-			transactionList = append(transactionList, transaction) // TODO: make this more efficient
+			add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 		} else if (msgType == "QUIT") || (msgType == "DIE") {
 			// TODO:
 		}
