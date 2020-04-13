@@ -10,7 +10,7 @@ import (
 )
 
 const MAXNEIGHBORS = 50
-const POLLINGPERIOD = 10 // poll neighbors for their neighors every 10 seconds
+const POLLINGPERIOD = 10 // poll neighbors for their neighors, transactions every POLLINGPERIOD*2 seconds
 
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
@@ -35,8 +35,9 @@ func main() {
 	localPort = arguments[3]
 
 	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
-	neighborMap = make(map[string]*nodeComm)
 	transactionMap = make(map[string]*TransactionMessage)
+	neighborMap = make(map[string]*nodeComm)
+	neighborMap[localNodeName] = nil // To avoid future errors
 
 	listener := setup_incoming_tcp()
 	connect_to_service()

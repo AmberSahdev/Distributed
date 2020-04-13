@@ -43,9 +43,11 @@ func (node *nodeComm) handle_outgoing_messages() {
 		node.poll_for_transaction()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 
-		/* // print transactions for debugging and verification purposes
-		for _, val := range transactionMap {fmt.Println(*val)}
-		*/
+		// print transactions for debugging and verification purposes
+		fmt.Println("\n")
+		for _, val := range transactionMap {
+			fmt.Println(*val)
+		}
 
 		node.poll_for_neighbors()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
@@ -64,13 +66,15 @@ func (node *nodeComm) poll_for_transaction() {
 
 func (node *nodeComm) poll_for_neighbors() {
 	// when called, ask neighbors about their neghbors
-	TransactionIDs := make([]ConnectionMessage, 0)
-	m := DiscoveryMessage{true, TransactionIDs}
+	/*TransactionIDs := make([]ConnectionMessage, 0)
+	m := DiscoveryMessage{true, TransactionIDs}*/
+	m := DiscoveryMessage{true}
 	err := node.tcp_enc_struct(m)
 	check(err)
 }
 
 func (node *nodeComm) handle_node_comm() {
+	fmt.Println("Start handle_node_comm for ", node.nodeName)
 	// handles all logic for communication between nodes
 	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
@@ -79,43 +83,75 @@ func (node *nodeComm) handle_node_comm() {
 		//fmt.Println("popping from node.inbox")
 		switch m := val.(type) {
 		case ConnectionMessage:
-			println("handle_node_comm ConnectionMessage")
+			//fmt.Println("handle_node_comm ConnectionMessage ", m)
+			if _, exists := neighborMap[m.NodeName]; !exists {
+				//fmt.Println("\t node doesn't exist  ")
+				newNode := new(nodeComm)
+				newNode.nodeName = m.NodeName
+				newNode.address = m.IPaddr + ":" + m.Port
+				newNode.inbox = make(chan Message, 65536)
+				neighborMap[newNode.nodeName] = newNode
+				connect_to_node(newNode)
+				go newNode.handle_node_comm()
+			}
+
 		case TransactionMessage:
-			println("handle_node_comm TransactionMessage")
+			//fmt.Println("handle_node_comm TransactionMessage")
 			add_transaction(m)
+
 		case DiscoveryMessage:
-			fmt.Println("handle_node_comm DiscoveryMessage ", m)
-			if m.Request { // received a request to send neighbors
-				msg := new(DiscoveryMessage)
-				msg.Request = false
+			//fmt.Println("handle_node_comm DiscoveryMessage ", m, " from ", node.nodeName)
+			if m.Request {
 				// send 5 random neighbors (first 5 neighbors)
 				numNeighborsSend := min(5, len(neighborMap))
-				msg.NeighborAddresses = make([]ConnectionMessage, numNeighborsSend)
 				i := 0
-				for _, v := range neighborMap {
-					if i == numNeighborsSend {
+				for k, v := range neighborMap {
+					if k == "mp2Service" || k == localNodeName || k == node.nodeName {
+						continue
+					} else if i == numNeighborsSend {
 						break
 					}
-					msg.NeighborAddresses[i] = *nodeComm_to_ConnectionMessage(v)
+					newMsg := *nodeComm_to_ConnectionMessage(v)
+					err := node.tcp_enc_struct(newMsg)
+					//fmt.Println("Sent ", node.nodeName, "\tnewMsg ", newMsg)
+					check(err)
+					i++
 				}
+			} else {
+				panic("ERROR received DiscoveryMessage with request false")
+			}
+			/*
+				if m.Request { // received a request to send neighbors
+					msg := new(DiscoveryMessage)
+					msg.Request = false
+					// send 5 random neighbors (first 5 neighbors)
+					numNeighborsSend := min(5, len(neighborMap))
+					msg.NeighborAddresses = make([]ConnectionMessage, numNeighborsSend)
+					i := 0
+					for _, v := range neighborMap {
+						if i == numNeighborsSend {
+							break
+						}
+						msg.NeighborAddresses[i] = *nodeComm_to_ConnectionMessage(v)
+					}
 
-				err := node.tcp_enc_struct(msg)
-				check(err)
+					err := node.tcp_enc_struct(msg)
+					check(err)
 
-			} else { // received a reply back with neighbor addresses
-				for _, connMsg := range m.NeighborAddresses {
-					if _, exists := neighborMap[connMsg.NodeName]; !exists {
-						node := new(nodeComm)
-						node.nodeName = connMsg.NodeName
-						node.address = connMsg.IPaddr + ":" + connMsg.Port
-						node.inbox = make(chan Message, 65536)
-						connect_to_node(node)
-						neighborMap[node.nodeName] = node
-						go node.handle_node_comm()
+				} else { // received a reply back with neighbor addresses
+					for _, connMsg := range m.NeighborAddresses {
+						if _, exists := neighborMap[connMsg.NodeName]; !exists {
+							node := new(nodeComm)
+							node.nodeName = connMsg.NodeName
+							node.address = connMsg.IPaddr + ":" + connMsg.Port
+							node.inbox = make(chan Message, 65536)
+							connect_to_node(node)
+							neighborMap[node.nodeName] = node
+							go node.handle_node_comm()
+						}
 					}
 				}
-
-			}
+			*/
 		case TransactionRequest:
 			//println("handle_node_comm TransactionRequest")
 			if m.Request == true && len(m.TransactionIDs) == 0 {

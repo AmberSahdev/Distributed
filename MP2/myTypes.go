@@ -32,8 +32,8 @@ type TransactionMessage struct { // Ex: TRANSACTION 1551208414.204385 f78480653b
 type DiscoveryMessage struct {
 	// if request = true, send back NeighborAddresses.
 	// if request = false, you just received NeighborAddresses.
-	Request           bool
-	NeighborAddresses []ConnectionMessage // list of node's address:port string
+	Request bool
+	//NeighborAddresses []ConnectionMessage // list of node's address:port string
 }
 
 type TransactionRequest struct {
