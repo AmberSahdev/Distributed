@@ -23,6 +23,7 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 	node.address = m.IPaddr + ":" + m.Port
 	node.conn = conn
 	node.inbox = make(chan Message, 65536)
+	fmt.Println("setup_neighbor ", m.NodeName, "\n")
 	return node
 }
 
@@ -48,9 +49,10 @@ func (node *nodeComm) handle_outgoing_messages() {
 
 func (node *nodeComm) poll_for_transaction() {
 	// when called, asks node.conn neighbor about the transaction IDs it has
-	var TransactionIDs []string // empty TransactionIDs list, len() == 0
+	//var TransactionIDs []string // empty TransactionIDs list, len() == 0
+	TransactionIDs := make([]string, 0)
 	m := TransactionRequest{true, TransactionIDs}
-	fmt.Printf("poll_for_transaction \t type: %T\n", m)
+	//fmt.Printf("sent poll_for_transaction \t type: %T\n", m)
 	err := node.tcp_enc_struct(m)
 	check(err)
 }
@@ -66,52 +68,59 @@ func (node *nodeComm) handle_node_comm() {
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
 
 	for val := range node.inbox {
-		fmt.Println("popping from node.inbox")
+		//fmt.Println("popping from node.inbox")
 		switch m := val.(type) {
 		case ConnectionMessage:
-			print("ConnectionMessage")
+			println("handle_node_comm ConnectionMessage")
 		case TransactionMessage:
-			print("TransactionMessage")
+			println("handle_node_comm TransactionMessage")
 		case DiscoveryMessage:
-			print("DiscoveryMessage")
+			println("handle_node_comm DiscoveryMessage")
 		case TransactionRequest:
-			print("TransactionRequest")
+			//println("handle_node_comm TransactionRequest")
 			if m.Request == true && len(m.TransactionIDs) == 0 {
 				// send all your TransactionIDs TODO: send only new transactionIDs (keep track of last sent index)
-				TransactionIDs := make([]string, len(transactionList)) // //var TransactionIDs []string
+				TransactionIDs := make([]string, len(transactionList))
 
 				for i, transaction := range transactionList {
 					TransactionIDs[i] = transaction.TransactionID
 				}
-				m = TransactionRequest{false, TransactionIDs}
-				fmt.Printf("case TransactionRequest 1 \t type: %T\n", m)
-				err := node.tcp_enc_struct(m)
+				msg := TransactionRequest{false, TransactionIDs}
+				//fmt.Println("sending handle_node_comm -> TransactionRequest 1 : ")
+				err := node.tcp_enc_struct(msg)
+
 				check(err)
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
 					i, _ := find_transaction(transactionList, transactionID)
-					fmt.Printf("case TransactionRequest 2 \t type: %T\n", m)
+					//fmt.Printf("case TransactionRequest 2 \t type: %T\n", m)
+					//fmt.Println("sending handle_node_comm -> TransactionRequest 2 : ")
 					err := node.tcp_enc_struct(*transactionList[i])
+
 					check(err)
 				}
 
 			} else if m.Request == false {
 				// you have received list of transactionIDs other node has
 				// check if you have the sent TransactionIDs (TODO: make it faster by making it dict)
-				var newtransactionIDs []string
-				for _, transactionID := range m.TransactionIDs {
-					_, exists := find_transaction(transactionList, transactionID)
-					if !exists {
-						newtransactionIDs = append(newtransactionIDs, transactionID)
+				if len(m.TransactionIDs) != 0 {
+					var newtransactionIDs []string
+					for _, transactionID := range m.TransactionIDs {
+						_, exists := find_transaction(transactionList, transactionID)
+						if !exists {
+							newtransactionIDs = append(newtransactionIDs, transactionID)
+						}
 					}
-				}
 
-				m = TransactionRequest{true, newtransactionIDs}
-				fmt.Printf("case TransactionRequest 3 \t type: %T\n", m)
-				err := node.tcp_enc_struct(m)
-				check(err)
+					msg := TransactionRequest{true, newtransactionIDs}
+					//fmt.Printf("case TransactionRequest 3 \t type: %T\n", m)
+					//fmt.Println("sending handle_node_comm -> TransactionRequest 3 : ")
+					err := node.tcp_enc_struct(msg)
+
+					check(err)
+				}
 			}
 
 		default:
@@ -122,34 +131,43 @@ func (node *nodeComm) handle_node_comm() {
 
 func (node *nodeComm) receive_incoming_data() {
 	// handles incoming data from other nodes (not mp2_service)
+	overflowData := ""
+	var structDataList []string
+	var structTypeList []string
 	for {
-		structType, structData := node.tcp_dec_struct()
-		fmt.Println("decoded in receive_incoming_data")
-		Databytes := []byte(structData)
+		structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
 
-		// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
-		if structType == "main.ConnectionMessage" {
-			m := new(ConnectionMessage)
-			err := json.Unmarshal(Databytes, m)
-			check(err)
-			node.inbox <- *m
-		} else if structType == "main.TransactionMessage" {
-			m := new(TransactionMessage)
-			err := json.Unmarshal(Databytes, m)
-			check(err)
-			node.inbox <- *m
-		} else if structType == "main.DiscoveryMessage" {
-			m := new(DiscoveryMessage)
-			err := json.Unmarshal(Databytes, m)
-			check(err)
-			node.inbox <- *m
-		} else if structType == "main.TransactionRequest" {
-			m := new(TransactionRequest)
-			err := json.Unmarshal(Databytes, m)
-			check(err)
-			node.inbox <- *m
-		} else {
-			panic("\n ERROR receive_incoming_data type: " + structType)
+		for i, structType := range structTypeList {
+			structData := structDataList[i]
+
+			// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
+			if structType == "main.ConnectionMessage" {
+				m := new(ConnectionMessage)
+				err := json.Unmarshal([]byte(structData), m)
+				check(err)
+				node.inbox <- *m
+
+			} else if structType == "main.TransactionMessage" {
+				m := new(TransactionMessage)
+				err := json.Unmarshal([]byte(structData), m)
+				check(err)
+				node.inbox <- *m
+
+			} else if structType == "main.DiscoveryMessage" {
+				m := new(DiscoveryMessage)
+				err := json.Unmarshal([]byte(structData), m)
+				check(err)
+				node.inbox <- *m
+
+			} else if structType == "main.TransactionRequest" {
+				m := new(TransactionRequest)
+				err := json.Unmarshal([]byte(structData), m)
+				check(err)
+				node.inbox <- *m
+
+			} else {
+				panic("\n ERROR receive_incoming_data type: " + structType)
+			}
 		}
 	}
 }
