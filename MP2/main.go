@@ -74,21 +74,18 @@ func main() {
 
 /**************************** Setup Functions ****************************/
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
-func Init_Logging(
-	infoHandle io.Writer,
-	warningHandle io.Writer,
-	errorHandle io.Writer) {
+func Init_Logging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
 	Info = log.New(infoHandle,
 		"INFO: ",
-		log.Ldate|log.Ltime|log.Lshortfile)
+		log.Ltime|log.Lshortfile)
 
 	Warning = log.New(warningHandle,
 		"WARNING: ",
-		log.Ldate|log.Ltime|log.Lshortfile)
+		log.Ltime|log.Lshortfile)
 
 	Error = log.New(errorHandle,
 		"ERROR: ",
-		log.Ldate|log.Ltime|log.Lshortfile)
+		log.Ltime|log.Lshortfile)
 }
 
 // Get preferred outbound ip of this machine
@@ -96,7 +93,7 @@ func GetOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		Error.Println("Failed to get local IP")
-		log.Fatal(err)
+		panic(err)
 	}
 	defer conn.Close()
 
