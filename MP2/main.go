@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html

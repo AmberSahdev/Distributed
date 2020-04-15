@@ -145,9 +145,9 @@ func debug_print_transactions() {
 		time.Sleep(POLLINGPERIOD * time.Second)
 
 		// print transactions for debugging and verification purposes
-		fmt.Println("\n")
+		Info.Println("\n")
 		for _, val := range transactionList {
-			fmt.Println(*val)
+			Info.Println(*val)
 		}
 
 		/*
@@ -169,7 +169,7 @@ func debug_print_transactions() {
 func (node *nodeComm) check_node_status() bool {
 	neighborMapMutex.Lock()
 	if _, exists := neighborMap[node.nodeName]; !exists {
-		fmt.Println("\nDisconnected ", node.nodeName)
+		Warning.Println("\nDisconnected ", node.nodeName)
 		neighborMapMutex.Unlock()
 		return false
 	}

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/gob"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net"
 	"time"
