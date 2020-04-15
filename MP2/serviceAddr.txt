@@ -1,1 +1,1 @@
-locahost:2000
+localhost:2000

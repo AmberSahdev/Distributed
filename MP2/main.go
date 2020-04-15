@@ -18,7 +18,7 @@ var (
 	Error   *log.Logger
 )
 
-const MAXNEIGHBORS = 50
+const MAXNEIGHBORS = 50  // probably too high
 const POLLINGPERIOD = 10 // poll neighbors for their neighbors, transactions every POLLINGPERIOD*2 seconds
 
 var localNodeName string             // tracks local node's name
@@ -45,11 +45,12 @@ func main() {
 	}
 
 	localNodeName = arguments[1]
-	localIPaddr = string(GetOutboundIP())
+	localIPaddr = GetOutboundIP()
 	Info.Println("Found local IP to be " + localIPaddr)
 	localPort = arguments[2]
 
-	mp2ServiceAddr = parseServiceTextfile("MP2/serviceAddr.txt")[0]
+	mp2ServiceAddr = parseServiceTextfile("serviceAddr.txt")[0]
+	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
 	transactionMap = make(map[string]*TransactionMessage)
 
 	neighborMap = make(map[string]*nodeComm)
@@ -91,16 +92,17 @@ func Init_Logging(
 }
 
 // Get preferred outbound ip of this machine
-func GetOutboundIP() net.IP {
+func GetOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
+		Error.Println("Failed to get local IP")
 		log.Fatal(err)
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-	return localAddr.IP
+	return localAddr.IP.String()
 }
 
 func parseServiceTextfile(path string) []string {
