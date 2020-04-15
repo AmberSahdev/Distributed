@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/gob"
 	"encoding/json"
-	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -13,7 +12,7 @@ import (
 // Performs our current error handling
 func check(e error) {
 	if e != nil {
-		fmt.Print("\n")
+		Error.Print("Error Detected:\n")
 		panic(e)
 	}
 }

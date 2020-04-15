@@ -25,7 +25,7 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 	node.address = m.IPaddr + ":" + m.Port
 	node.conn = conn
 	node.inbox = make(chan Message, 65536)
-	fmt.Println("setup_neighbor ", m.NodeName, "\n")
+	Info.Println("setup_neighbor ", m.NodeName, "\n")
 	return node
 }
 
@@ -72,7 +72,7 @@ func (node *nodeComm) poll_for_neighbors() {
 }
 
 func (node *nodeComm) handle_node_comm() {
-	fmt.Println("Start handle_node_comm for ", node.nodeName)
+	Info.Println("Start handle_node_comm for ", node.nodeName)
 	// handles all logic for communication between nodes
 	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
@@ -97,7 +97,7 @@ func (node *nodeComm) handle_node_comm() {
 			}
 
 		case TransactionMessage:
-			fmt.Println("exchanged transaction, from ", node.nodeName)
+			Info.Println("exchanged transaction, from ", node.nodeName)
 			add_transaction(m)
 
 		case DiscoveryMessage:
@@ -175,10 +175,10 @@ func (node *nodeComm) handle_node_comm() {
 				neighborMapMutex.Lock()
 				delete(neighborMap, node.nodeName)
 				neighborMapMutex.Unlock()
-				fmt.Println("\nreturning from handle_node_comm for ", node.nodeName)
+				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
-			fmt.Println("\n ERROR Unknown Type in handle_node_comm \t ", m)
+			Error.Println("\n ERROR Unknown Type in handle_node_comm \t ", m)
 			panic("")
 		}
 	}

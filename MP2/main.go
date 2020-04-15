@@ -1,7 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -10,8 +12,15 @@ import (
 	"time"
 )
 
+// from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
+var (
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
+)
+
 const MAXNEIGHBORS = 50
-const POLLINGPERIOD = 10 // poll neighbors for their neighors, transactions every POLLINGPERIOD*2 seconds
+const POLLINGPERIOD = 10 // poll neighbors for their neighbors, transactions every POLLINGPERIOD*2 seconds
 
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
@@ -29,17 +38,19 @@ var transactionMapMutex sync.Mutex
 var transactionListMutex sync.Mutex
 
 func main() {
+	Init_Logging(os.Stdout, os.Stdout, os.Stderr)
 	arguments := os.Args
-	if len(arguments) != 4 {
-		fmt.Println("Expected Format: ./gossip [Local Node Name] [ipAddress] [port]")
+	if len(arguments) != 3 {
+		Error.Println("Expected Format: ./gossip [Local Node Name] [port]")
 		return
 	}
 
 	localNodeName = arguments[1]
-	localIPaddr = arguments[2]
-	localPort = arguments[3]
+	localIPaddr = string(GetOutboundIP())
+	Info.Println("Found local IP to be " + localIPaddr)
+	localPort = arguments[2]
 
-	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
+	mp2ServiceAddr = parseServiceTextfile("MP2/serviceAddr.txt")[0]
 	transactionMap = make(map[string]*TransactionMessage)
 
 	neighborMap = make(map[string]*nodeComm)
@@ -49,12 +60,9 @@ func main() {
 	transactionMapMutex = sync.Mutex{}
 	transactionListMutex = sync.Mutex{}
 
-	listener := setup_incoming_tcp()
+	go listen_for_conns()
 	connect_to_service()
 	go handle_service_comms()
-	time.Sleep(5 * time.Second) // give service time to communicate
-
-	go listen_for_conns(listener)
 
 	go debug_print_transactions() // TODO: remove later
 
@@ -65,10 +73,41 @@ func main() {
 }
 
 /**************************** Setup Functions ****************************/
-func setup_incoming_tcp() net.Listener {
-	listener, err := net.Listen("tcp", ":"+localPort) // open port
+// from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
+func Init_Logging(
+	infoHandle io.Writer,
+	warningHandle io.Writer,
+	errorHandle io.Writer) {
+	Info = log.New(infoHandle,
+		"INFO: ",
+		log.Ldate|log.Ltime|log.Lshortfile)
+
+	Warning = log.New(warningHandle,
+		"WARNING: ",
+		log.Ldate|log.Ltime|log.Lshortfile)
+
+	Error = log.New(errorHandle,
+		"ERROR: ",
+		log.Ldate|log.Ltime|log.Lshortfile)
+}
+
+// Get preferred outbound ip of this machine
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
+}
+
+func parseServiceTextfile(path string) []string {
+	dat, err := ioutil.ReadFile(path)
 	check(err)
-	return listener
+	return strings.Split(string(dat), "\n")
 }
 
 func connect_to_service() {
@@ -92,7 +131,7 @@ func connect_to_service() {
 func handle_service_comms() {
 	mp2Service := neighborMap["mp2Service"]
 	m := "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	fmt.Printf("handle_service_comms \t type: %T\n", m)
+	Info.Printf("handle_service_comms \t type: %T\n", m)
 	_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
 	check(err)
 
@@ -136,14 +175,16 @@ func handle_service_comms() {
 	}
 }
 
-func listen_for_conns(listener net.Listener) {
+func listen_for_conns() {
 	var conn net.Conn
-	var err error = nil
+	listener, err := net.Listen("tcp", ":"+localPort) // open port
+	check(err)
 	for err == nil {
 		conn, err = listener.Accept()
 		node := setup_neighbor(conn)
 		go node.handle_node_comm() // open up a go routine
 	}
 	_ = listener.Close()
-	panic("ERROR receiving incoming connections")
+	Error.Println("Stopped listening because of error")
+	panic(err)
 }
