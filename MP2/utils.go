@@ -7,6 +7,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Performs our current error handling
@@ -55,6 +56,13 @@ func (node *nodeComm) tcp_enc_struct(m Message) error {
 	check(err)
 	mJSON = append(prefix, mJSON...) // appending a slice to a slice
 
+	neighborMapMutex.Lock()
+	if _, exists := neighborMap[node.nodeName]; !exists {
+		neighborMapMutex.Unlock()
+		return nil
+	}
+	neighborMapMutex.Unlock()
+
 	_, err = node.conn.Write([]byte(mJSON))
 	//fmt.Println("\t sent ", string(mJSON))
 	//check(err) // checked on callee-side
@@ -73,7 +81,10 @@ func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, s
 	*/
 	buf := make([]byte, 1024)
 	l, err := node.conn.Read(buf)
-	check(err)
+	//check(err)
+	if err != nil {
+		return nil, nil, "DISCONNECTED"
+	}
 
 	//fmt.Println("\nReceived the following on decoding side with overflowData: ", overflowData+string(buf[:l]))
 
@@ -103,8 +114,13 @@ func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, s
 func add_transaction(m TransactionMessage) {
 	newM := new(TransactionMessage)
 	*newM = m
+	transactionListMutex.Lock()
 	transactionList = append(transactionList, newM) // TODO: make it more efficient
+	transactionListMutex.Unlock()
+
+	transactionMapMutex.Lock()
 	transactionMap[m.TransactionID] = newM
+	transactionMapMutex.Unlock()
 }
 
 // Find takes a slice and looks for an element in it. If found it will
@@ -123,4 +139,30 @@ func nodeComm_to_ConnectionMessage(nodePtr *nodeComm) *ConnectionMessage {
 	ret.IPaddr = strings.Split(nodePtr.address, ":")[0]
 	ret.Port = strings.Split(nodePtr.address, ":")[1]
 	return ret
+}
+
+func debug_print_transactions() {
+	for {
+		time.Sleep(POLLINGPERIOD * time.Second)
+
+		// print transactions for debugging and verification purposes
+		fmt.Println("\n")
+		for _, val := range transactionList {
+			fmt.Println(*val)
+		}
+
+		/*
+			// doesn't let the program continue executing
+				buf := make([]byte, 1<<16)
+				runtime.Stack(buf, true)
+				fmt.Printf("%s", buf)
+
+				fmt.Println("end debug_print_transactions")
+		*/
+
+		// fmt.Print("neighborMap:")
+		// for k, _ := range neighborMap {
+		// 	fmt.Print(k, ",")
+		// }
+	}
 }

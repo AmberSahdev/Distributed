@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +24,10 @@ var mp2ServiceAddr string
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
 var transactionMap map[string]*TransactionMessage
 
+var neighborMapMutex sync.Mutex
+var transactionMapMutex sync.Mutex
+var transactionListMutex sync.Mutex
+
 func main() {
 	arguments := os.Args
 	if len(arguments) != 4 {
@@ -36,8 +41,13 @@ func main() {
 
 	mp2ServiceAddr = "localhost:2000" // TODO: fix this to be more dynamic
 	transactionMap = make(map[string]*TransactionMessage)
+
 	neighborMap = make(map[string]*nodeComm)
 	neighborMap[localNodeName] = nil // To avoid future errors
+
+	neighborMapMutex = sync.Mutex{}
+	transactionMapMutex = sync.Mutex{}
+	transactionListMutex = sync.Mutex{}
 
 	listener := setup_incoming_tcp()
 	connect_to_service()
@@ -45,6 +55,8 @@ func main() {
 	time.Sleep(5 * time.Second) // give service time to communicate
 
 	go listen_for_conns(listener)
+
+	go debug_print_transactions() // TODO: remove later
 
 	// handle the ever updating list of transactions (do any kind of reordering, maintenance work here)
 	go blockchain()
@@ -71,7 +83,9 @@ func connect_to_service() {
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
 
+	neighborMapMutex.Lock()
 	neighborMap["mp2Service"] = mp2Service
+	neighborMapMutex.Unlock()
 }
 
 /**************************** Go Routines ****************************/
@@ -101,7 +115,9 @@ func handle_service_comms() {
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
 			node.inbox = make(chan Message, 65536)
 			connect_to_node(node)
+			neighborMapMutex.Lock()
 			neighborMap[node.nodeName] = node
+			neighborMapMutex.Unlock()
 			go node.handle_node_comm()
 		} else if msgType == "TRANSACTION" {
 			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10

@@ -18,7 +18,9 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 	check(err)
 
 	node := new(nodeComm)
+	neighborMapMutex.Lock()
 	neighborMap[m.NodeName] = node
+	neighborMapMutex.Unlock()
 	node.nodeName = m.NodeName
 	node.address = m.IPaddr + ":" + m.Port
 	node.conn = conn
@@ -40,15 +42,16 @@ func (node *nodeComm) handle_outgoing_messages() {
 	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	//rand := time.Duration(0) // for stress test debugging purposes
 	for {
+		neighborMapMutex.Lock()
+		if _, exists := neighborMap[node.nodeName]; !exists {
+			fmt.Println("\nDisconnected ", node.nodeName)
+			neighborMapMutex.Unlock()
+			return
+		}
+		neighborMapMutex.Unlock()
+
 		node.poll_for_transaction()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
-
-		// print transactions for debugging and verification purposes
-		fmt.Println("\n")
-		for _, val := range transactionMap {
-			fmt.Println(*val)
-		}
-
 		node.poll_for_neighbors()
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
@@ -80,17 +83,22 @@ func (node *nodeComm) handle_node_comm() {
 	for val := range node.inbox {
 		switch m := val.(type) {
 		case ConnectionMessage:
+			neighborMapMutex.Lock()
 			if _, exists := neighborMap[m.NodeName]; !exists {
 				newNode := new(nodeComm)
 				newNode.nodeName = m.NodeName
 				newNode.address = m.IPaddr + ":" + m.Port
 				newNode.inbox = make(chan Message, 65536)
 				neighborMap[newNode.nodeName] = newNode
+				neighborMapMutex.Unlock()
 				connect_to_node(newNode)
 				go newNode.handle_node_comm()
+			} else {
+				neighborMapMutex.Unlock()
 			}
 
 		case TransactionMessage:
+			fmt.Println("exchanged transaction, from ", node.nodeName)
 			add_transaction(m)
 
 		case DiscoveryMessage:
@@ -162,9 +170,19 @@ func (node *nodeComm) handle_node_comm() {
 			}
 
 		default:
-			panic("\n ERROR Unknown Type in handle_node_comm")
+			if m == "DISCONNECTED" {
+				close(node.inbox)
+				neighborMapMutex.Lock()
+				delete(neighborMap, node.nodeName)
+				neighborMapMutex.Unlock()
+				fmt.Println("\nreturning from handle_node_comm for ", node.nodeName)
+				return
+			}
+			fmt.Println("\n ERROR Unknown Type in handle_node_comm \t ", m)
+			panic("")
 		}
 	}
+	panic("ERROR: outside for loop in handle_node_comm")
 }
 
 func (node *nodeComm) receive_incoming_data() {
@@ -174,6 +192,11 @@ func (node *nodeComm) receive_incoming_data() {
 	var structTypeList []string
 	for {
 		structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
+
+		if structTypeList == nil && structDataList == nil && overflowData == "DISCONNECTED" {
+			node.inbox <- "DISCONNECTED"
+			return
+		}
 
 		for i, structType := range structTypeList {
 			structData := structDataList[i]
