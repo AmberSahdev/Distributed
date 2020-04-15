@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"io"
 	"io/ioutil"
 	"log"
@@ -38,12 +39,13 @@ var transactionListMutex sync.Mutex
 
 func main() {
 	Init_Logging(os.Stdout, os.Stdout, os.Stderr)
+	Init_Gob()
 	arguments := os.Args
 	if len(arguments) != 3 {
 		Error.Println("Expected Format: ./gossip [Local Node Name] [port]")
 		return
 	}
-
+	numConns = 0
 	localNodeName = arguments[1]
 	localIPaddr = GetOutboundIP()
 	Info.Println("Found local IP to be " + localIPaddr)
@@ -88,6 +90,13 @@ func Init_Logging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.
 		log.Ltime|log.Lshortfile)
 }
 
+func Init_Gob() {
+	gob.Register(&ConnectionMessage{})
+	gob.Register(&TransactionMessage{})
+	gob.Register(&DiscoveryMessage{})
+	gob.Register(&TransactionRequest{})
+}
+
 // Get preferred outbound ip of this machine
 func GetOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
@@ -116,6 +125,8 @@ func connect_to_service() {
 	mp2Service.nodeName = "mp2Service"
 	mp2Service.address = mp2ServiceAddr
 	mp2Service.inbox = nil
+	mp2Service.outbox = nil
+	mp2Service.isConnected = true
 
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
@@ -136,7 +147,7 @@ func handle_service_comms() {
 	//    1.1 Upto 3 INTRODUCE
 	//    1.2 TRANSACTION messages
 	//    1.3 QUIT/DIE
-	buf := make([]byte, 1024) // Make a buffer to hold incoming data
+	buf := make([]byte, 65536) // Make a buffer to hold incoming data
 	for {
 		len, err := mp2Service.conn.Read(buf)
 		check(err)
@@ -149,7 +160,6 @@ func handle_service_comms() {
 			node := new(nodeComm)
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
-			node.inbox = make(chan Message, 65536)
 			connect_to_node(node) // TODO: do handle node comms inside this routine
 			neighborMapMutex.Lock()
 			neighborMap[node.nodeName] = node
@@ -167,7 +177,7 @@ func handle_service_comms() {
 			*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
 			add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 		} else if (msgType == "QUIT") || (msgType == "DIE") {
-			// TODO:
+			// TODO: impelment a better quit or die handler
 			Error.Println("QUIT or DIE received")
 			panic(mp2ServiceMsg)
 		}

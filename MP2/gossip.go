@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/gob"
-	"encoding/json"
 	"math/rand"
 	"net"
 	"time"
@@ -12,70 +11,75 @@ import (
 func setup_neighbor(conn net.Conn) *nodeComm {
 	// Called when a neighbor is trying to connect to this node
 	tcpDec := gob.NewDecoder(conn)
-	m := new(ConnectionMessage)
-	err := tcpDec.Decode(m)
+	var incoming interface{}
+	err := tcpDec.Decode(&incoming)
 	check(err)
-	node := new(nodeComm)
-	node.nodeName = m.NodeName
-	node.address = m.IPaddr + ":" + m.Port
-	node.conn = conn
-	node.inbox = make(chan Message, 65536)
-	// node.isConnected = true
-	Info.Println("setup_neighbor ", m.NodeName, "\n")
-	neighborMapMutex.Lock()
-	neighborMap[m.NodeName] = node
-	neighborMapMutex.Unlock()
-	return node
+	switch m := incoming.(type) {
+	case *ConnectionMessage:
+		node := new(nodeComm)
+		node.isConnected = true
+		node.nodeName = m.NodeName
+		node.address = m.IPaddr + ":" + m.Port
+		node.conn = conn
+		node.inbox = make(chan Message, 65536)
+		node.outbox = make(chan Message, 65536)
+		// node.isConnected = true
+		Info.Println("setup_neighbor", m.NodeName)
+		neighborMapMutex.Lock()
+		neighborMap[m.NodeName] = node
+		neighborMapMutex.Unlock()
+		return node
+	default:
+		Error.Println("Got unexpected type as first messge:", incoming)
+	}
+	return nil
 }
 
 /**************************** Go Routines ****************************/
 // TODO: create a dedicated TCP thread for doing all the outgoing communications and push to it via an outbox channel
 func (node *nodeComm) handle_outgoing_messages() {
-	//   one per NodeComm
-	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
-	//   handle messages of the following type:
-	//		 - poll neighbor for transactions (POLL:TRANSACTION_IDs)
-	//     - send pull request
-	//     - send transactions upon a pull request
-	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
-
-	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
-	//rand := time.Duration(0) // for stress test debugging purposes
-	var alive bool
-	for { // TODO: use isConnected node status here
-		alive = node.check_node_status()
-		if alive {
-			node.poll_for_transaction()
+	tcpEnc := gob.NewEncoder(node.conn)
+	var m Message
+	for m = range node.outbox {
+		err := tcpEnc.Encode(m)
+		if err != nil {
+			Error.Println("Failed to send Message, receiver down?")
+			_ = node.conn.Close()
+			return
 		}
-		time.Sleep((POLLINGPERIOD + rand) * time.Second)
-		alive = node.check_node_status()
-		if alive {
-			node.poll_for_neighbors()
-		}
-		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
 }
 
 func (node *nodeComm) poll_for_transaction() { // TODO: push to outbox
 	// when called, asks node.conn neighbor about the transaction IDs it has
 	TransactionIDs := make([]string, 0)
-	m := TransactionRequest{true, TransactionIDs}
-	err := node.tcp_enc_struct(m)
-	check(err)
+	m := new(TransactionRequest)
+	*m = TransactionRequest{true, TransactionIDs}
+	if node.isConnected {
+		node.outbox <- m
+	} else {
+		Warning.Println("node", node.nodeName, "not connected, cancelling Poll for Transactions")
+	}
 }
 
 func (node *nodeComm) poll_for_neighbors() { // TODO: push to outbox
 	// when called, ask neighbors about their neghbors
-	m := DiscoveryMessage{true}
-	err := node.tcp_enc_struct(m)
-	check(err)
+	m := new(DiscoveryMessage)
+	*m = DiscoveryMessage{true}
+	if node.isConnected {
+		node.outbox <- m
+	} else {
+		Warning.Println("node", node.nodeName, "not connected, cancelling Poll for Neighbors")
+	}
+
 }
 
 func (node *nodeComm) handle_node_comm() {
 	Info.Println("Start handle_node_comm for ", node.nodeName)
 	// handles all logic for communication between nodes
-	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
+	go node.handle_outgoing_messages()
+
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
 	lastSentTransactionIndex := 0 // to send only new transactionIDs, need to keep track of last sent index
@@ -89,6 +93,8 @@ func (node *nodeComm) handle_node_comm() {
 				newNode.nodeName = m.NodeName
 				newNode.address = m.IPaddr + ":" + m.Port
 				newNode.inbox = make(chan Message, 65536)
+				newNode.outbox = make(chan Message, 65536)
+				newNode.isConnected = true
 				neighborMap[newNode.nodeName] = newNode
 				neighborMapMutex.Unlock()
 				connect_to_node(newNode)
@@ -113,8 +119,7 @@ func (node *nodeComm) handle_node_comm() {
 						break
 					}
 					newMsg := *nodeComm_to_ConnectionMessage(v)
-					err := node.tcp_enc_struct(newMsg)
-					check(err)
+					node.outbox <- newMsg
 					i++
 				}
 			} else {
@@ -136,17 +141,14 @@ func (node *nodeComm) handle_node_comm() {
 
 				msg := TransactionRequest{false, TransactionIDs}
 
-				err := node.tcp_enc_struct(msg)
-
-				check(err)
+				node.outbox <- msg
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
 					exists, transactionPtr := find_transaction(transactionID)
 					if exists {
-						err := node.tcp_enc_struct(*transactionPtr) // TODO: Should push to outbox
-						check(err)
+						node.outbox <- *transactionPtr
 					} else {
 						panic("ERROR You should not receive request for a transactionID that you do not have")
 					}
@@ -164,16 +166,15 @@ func (node *nodeComm) handle_node_comm() {
 					}
 
 					msg := TransactionRequest{true, newtransactionIDs}
-					err := node.tcp_enc_struct(msg)
-					check(err)
+					node.outbox <- msg
 				}
 			}
 		default:
 			if m == "DISCONNECTED" {
 				node.conn.Close()
 				close(node.inbox)
-				// TODO: set isConnected for the node to false
 				neighborMapMutex.Lock()
+				node.isConnected = false
 				delete(neighborMap, node.nodeName) // TODO: track disconnected node using variable not map
 				neighborMapMutex.Unlock()
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
@@ -187,46 +188,75 @@ func (node *nodeComm) handle_node_comm() {
 }
 
 func (node *nodeComm) receive_incoming_data() {
+	tcpDecode := gob.NewDecoder(node.conn)
+	var err error
+	for err == nil {
+		newM := new(Message)
+		err = tcpDecode.Decode(newM)
+		node.inbox <- *newM
+	}
+	close(node.inbox)
+	Error.Println("Closing inbox for node", node.nodeName)
 	// handles incoming data from other nodes (not mp2_service)
-	overflowData := ""
-	var structDataList []string
-	var structTypeList []string
-	for {
-		structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
+	/*
+		overflowData := ""
+		var structDataList []string
+		var structTypeList []string
+		for {
+			structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
 
-		if structTypeList == nil && structDataList == nil && overflowData == "DISCONNECTED" {
-			node.inbox <- "DISCONNECTED"
-			return
-		}
+			if structTypeList == nil && structDataList == nil && overflowData == "DISCONNECTED" {
+				node.inbox <- "DISCONNECTED"
+				return
+			}
 
-		for i, structType := range structTypeList {
-			structData := structDataList[i]
+			for i, structType := range structTypeList {
+				structData := structDataList[i]
 
-			// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
-			// TODO convert to case statement
-			if structType == "main.ConnectionMessage" {
-				m := new(ConnectionMessage)
-				err := json.Unmarshal([]byte(structData), m)
-				check(err)
-				node.inbox <- *m
-			} else if structType == "main.TransactionMessage" {
-				m := new(TransactionMessage)
-				err := json.Unmarshal([]byte(structData), m)
-				check(err)
-				node.inbox <- *m
-			} else if structType == "main.DiscoveryMessage" {
-				m := new(DiscoveryMessage)
-				err := json.Unmarshal([]byte(structData), m)
-				check(err)
-				node.inbox <- *m
-			} else if structType == "main.TransactionRequest" {
-				m := new(TransactionRequest)
-				err := json.Unmarshal([]byte(structData), m)
-				check(err)
-				node.inbox <- *m
-			} else {
-				panic("\n ERROR receive_incoming_data type: " + structType)
+				// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
+				// TODO convert to case statement
+				if structType == "main.ConnectionMessage" {
+					m := new(ConnectionMessage)
+					err := json.Unmarshal([]byte(structData), m)
+					check(err)
+					node.inbox <- *m
+				} else if structType == "main.TransactionMessage" {
+					m := new(TransactionMessage)
+					err := json.Unmarshal([]byte(structData), m)
+					check(err)
+					node.inbox <- *m
+				} else if structType == "main.DiscoveryMessage" {
+					m := new(DiscoveryMessage)
+					err := json.Unmarshal([]byte(structData), m)
+					check(err)
+					node.inbox <- *m
+				} else if structType == "main.TransactionRequest" {
+					m := new(TransactionRequest)
+					err := json.Unmarshal([]byte(structData), m)
+					check(err)
+					node.inbox <- *m
+				} else {
+					panic("\n ERROR receive_incoming_data type: " + structType)
+				}
 			}
 		}
+	*/
+}
+
+func (node *nodeComm) configureGossipProtocol() {
+	//   one per NodeComm
+	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
+	//   handle messages of the following type:
+	//		 - poll neighbor for transactions (POLL:TRANSACTION_IDs)
+	//     - send pull request
+	//     - send transactions upon a pull request
+	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
+
+	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+	//rand := time.Duration(0) // for stress test debugging purposes
+	for node.isConnected { // TODO: use isConnected node status here
+		node.poll_for_transaction()
+		node.poll_for_neighbors()
+		time.Sleep((POLLINGPERIOD + rand) * time.Second)
 	}
 }

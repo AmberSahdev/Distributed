@@ -35,11 +35,14 @@ func min(x, y int) int {
 func connect_to_node(node *nodeComm) {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
+	node.inbox = make(chan Message, 65536)
+	node.outbox = make(chan Message, 65536)
+	node.isConnected = false
 	node.conn, err = net.Dial("tcp", node.address)
 	check(err) // TODO: maybe dont crash here
-
 	tcpEnc := gob.NewEncoder(node.conn)
-	m := ConnectionMessage{
+	m := new(Message)
+	*m = ConnectionMessage{
 		NodeName: localNodeName,
 		IPaddr:   localIPaddr,
 		Port:     localPort,

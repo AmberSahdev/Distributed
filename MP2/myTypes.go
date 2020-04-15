@@ -5,9 +5,10 @@ import "net"
 // ----- Structure to store metadata about nodes introduced to us by mp2_service -----
 type nodeComm struct {
 	nodeName    string
-	address     string // outgoing node's address:port string
+	address     string // neighboring node's address:port string
 	conn        net.Conn
-	inbox       chan Message // channel to receive Messages received from neighbors
+	inbox       chan Message // channel to receive Messages received from neighbor
+	outbox      chan Message // channel to send Messages to neighbor
 	isConnected bool         // Don't need it because we can just remove it from the list on disconnection
 }
 
