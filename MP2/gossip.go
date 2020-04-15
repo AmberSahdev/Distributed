@@ -41,13 +41,14 @@ func (node *nodeComm) handle_outgoing_messages() {
 
 	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	//rand := time.Duration(0) // for stress test debugging purposes
+	var alive bool
 	for {
-		alive := node.check_node_status()
+		alive = node.check_node_status()
 		if alive {
 			node.poll_for_transaction()
 		}
 		time.Sleep((POLLINGPERIOD + rand) * time.Second)
-		alive := node.check_node_status()
+		alive = node.check_node_status()
 		if alive {
 			node.poll_for_neighbors()
 		}
