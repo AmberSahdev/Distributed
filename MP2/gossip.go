@@ -15,20 +15,21 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 	m := new(ConnectionMessage)
 	err := tcpDec.Decode(m)
 	check(err)
-
 	node := new(nodeComm)
-	neighborMapMutex.Lock()
-	neighborMap[m.NodeName] = node
-	neighborMapMutex.Unlock()
 	node.nodeName = m.NodeName
 	node.address = m.IPaddr + ":" + m.Port
 	node.conn = conn
 	node.inbox = make(chan Message, 65536)
+	// node.isConnected = true
 	Info.Println("setup_neighbor ", m.NodeName, "\n")
+	neighborMapMutex.Lock()
+	neighborMap[m.NodeName] = node
+	neighborMapMutex.Unlock()
 	return node
 }
 
 /**************************** Go Routines ****************************/
+// TODO: create a dedicated TCP thread for doing all the outgoing communications and push to it via an outbox channel
 func (node *nodeComm) handle_outgoing_messages() {
 	//   one per NodeComm
 	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
@@ -41,7 +42,7 @@ func (node *nodeComm) handle_outgoing_messages() {
 	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	//rand := time.Duration(0) // for stress test debugging purposes
 	var alive bool
-	for {
+	for { // TODO: use isConnected node status here
 		alive = node.check_node_status()
 		if alive {
 			node.poll_for_transaction()
@@ -55,7 +56,7 @@ func (node *nodeComm) handle_outgoing_messages() {
 	}
 }
 
-func (node *nodeComm) poll_for_transaction() {
+func (node *nodeComm) poll_for_transaction() { // TODO: push to outbox
 	// when called, asks node.conn neighbor about the transaction IDs it has
 	TransactionIDs := make([]string, 0)
 	m := TransactionRequest{true, TransactionIDs}
@@ -63,7 +64,7 @@ func (node *nodeComm) poll_for_transaction() {
 	check(err)
 }
 
-func (node *nodeComm) poll_for_neighbors() {
+func (node *nodeComm) poll_for_neighbors() { // TODO: push to outbox
 	// when called, ask neighbors about their neghbors
 	m := DiscoveryMessage{true}
 	err := node.tcp_enc_struct(m)
@@ -75,6 +76,7 @@ func (node *nodeComm) handle_node_comm() {
 	// handles all logic for communication between nodes
 	go node.handle_outgoing_messages()
 	go node.receive_incoming_data() // put messages of this conn into node.inbox
+	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
 	lastSentTransactionIndex := 0 // to send only new transactionIDs, need to keep track of last sent index
 
@@ -90,7 +92,7 @@ func (node *nodeComm) handle_node_comm() {
 				neighborMap[newNode.nodeName] = newNode
 				neighborMapMutex.Unlock()
 				connect_to_node(newNode)
-				go newNode.handle_node_comm()
+				go newNode.handle_node_comm() // TODO: do this inside connect to node
 			} else {
 				neighborMapMutex.Unlock()
 			}
@@ -120,6 +122,7 @@ func (node *nodeComm) handle_node_comm() {
 			}
 
 		case TransactionRequest:
+			// TODO: revist after blockchain discussion
 			if m.Request == true && len(m.TransactionIDs) == 0 {
 				// send all your TransactionIDs
 				l := max(0, len(transactionList)-lastSentTransactionIndex)
@@ -142,13 +145,12 @@ func (node *nodeComm) handle_node_comm() {
 				for _, transactionID := range m.TransactionIDs {
 					exists, transactionPtr := find_transaction(transactionID)
 					if exists {
-						err := node.tcp_enc_struct(*transactionPtr)
+						err := node.tcp_enc_struct(*transactionPtr) // TODO: Should push to outbox
 						check(err)
 					} else {
 						panic("ERROR You should not receive request for a transactionID that you do not have")
 					}
 				}
-
 			} else if m.Request == false {
 				// you have received list of transactionIDs other node has
 				// check if you have the received TransactionIDs
@@ -166,13 +168,13 @@ func (node *nodeComm) handle_node_comm() {
 					check(err)
 				}
 			}
-
 		default:
 			if m == "DISCONNECTED" {
 				node.conn.Close()
 				close(node.inbox)
+				// TODO: set isConnected for the node to false
 				neighborMapMutex.Lock()
-				delete(neighborMap, node.nodeName)
+				delete(neighborMap, node.nodeName) // TODO: track disconnected node using variable not map
 				neighborMapMutex.Unlock()
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
@@ -201,30 +203,27 @@ func (node *nodeComm) receive_incoming_data() {
 			structData := structDataList[i]
 
 			// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
+			// TODO convert to case statement
 			if structType == "main.ConnectionMessage" {
 				m := new(ConnectionMessage)
 				err := json.Unmarshal([]byte(structData), m)
 				check(err)
 				node.inbox <- *m
-
 			} else if structType == "main.TransactionMessage" {
 				m := new(TransactionMessage)
 				err := json.Unmarshal([]byte(structData), m)
 				check(err)
 				node.inbox <- *m
-
 			} else if structType == "main.DiscoveryMessage" {
 				m := new(DiscoveryMessage)
 				err := json.Unmarshal([]byte(structData), m)
 				check(err)
 				node.inbox <- *m
-
 			} else if structType == "main.TransactionRequest" {
 				m := new(TransactionRequest)
 				err := json.Unmarshal([]byte(structData), m)
 				check(err)
 				node.inbox <- *m
-
 			} else {
 				panic("\n ERROR receive_incoming_data type: " + structType)
 			}

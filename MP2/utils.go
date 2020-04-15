@@ -31,6 +31,7 @@ func min(x, y int) int {
 	return x
 }
 
+// TODO: Make this a goroutine
 func connect_to_node(node *nodeComm) {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
@@ -118,7 +119,7 @@ func add_transaction(m TransactionMessage) {
 	transactionListMutex.Unlock()
 
 	transactionMapMutex.Lock()
-	transactionMap[m.TransactionID] = newM
+	transactionMap[m.TransactionID] = newM // can't assume what's in the list is in the map.
 	transactionMapMutex.Unlock()
 }
 
@@ -168,11 +169,10 @@ func debug_print_transactions() {
 
 func (node *nodeComm) check_node_status() bool {
 	neighborMapMutex.Lock()
+	defer neighborMapMutex.Unlock()
 	if _, exists := neighborMap[node.nodeName]; !exists {
 		Warning.Println("\nDisconnected ", node.nodeName)
-		neighborMapMutex.Unlock()
 		return false
 	}
-	neighborMapMutex.Unlock()
 	return true
 }

@@ -119,7 +119,6 @@ func connect_to_service() {
 
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
-
 	neighborMapMutex.Lock()
 	neighborMap["mp2Service"] = mp2Service
 	neighborMapMutex.Unlock()
@@ -151,7 +150,7 @@ func handle_service_comms() {
 			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
 			node.inbox = make(chan Message, 65536)
-			connect_to_node(node)
+			connect_to_node(node) // TODO: do handle node comms inside this routine
 			neighborMapMutex.Lock()
 			neighborMap[node.nodeName] = node
 			neighborMapMutex.Unlock()
@@ -169,6 +168,8 @@ func handle_service_comms() {
 			add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 		} else if (msgType == "QUIT") || (msgType == "DIE") {
 			// TODO:
+			Error.Println("QUIT or DIE received")
+			panic(mp2ServiceMsg)
 		}
 	}
 }
