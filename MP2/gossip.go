@@ -170,9 +170,8 @@ func (node *nodeComm) handle_node_comm() {
 				}
 			}
 		default:
-			if m == "DISCONNECTED" {
+			if m == "DISCONNECTED" || m == nil {
 				node.conn.Close()
-				close(node.inbox)
 				neighborMapMutex.Lock()
 				node.isConnected = false
 				delete(neighborMap, node.nodeName) // TODO: track disconnected node using variable not map
@@ -180,8 +179,7 @@ func (node *nodeComm) handle_node_comm() {
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
-			Error.Println("\n ERROR Unknown Type in handle_node_comm \t ", m)
-			panic("")
+			Warning.Println("Unknown Type in handle_node_comm ", m)
 		}
 	}
 	panic("ERROR: outside for loop in handle_node_comm")
@@ -189,58 +187,15 @@ func (node *nodeComm) handle_node_comm() {
 
 func (node *nodeComm) receive_incoming_data() {
 	tcpDecode := gob.NewDecoder(node.conn)
-	var err error
+	var err error = nil
 	for err == nil {
 		newM := new(Message)
 		err = tcpDecode.Decode(newM)
 		node.inbox <- *newM
 	}
+	node.inbox <- "DISCONNECTED"
 	close(node.inbox)
-	Error.Println("Closing inbox for node", node.nodeName)
-	// handles incoming data from other nodes (not mp2_service)
-	/*
-		overflowData := ""
-		var structDataList []string
-		var structTypeList []string
-		for {
-			structTypeList, structDataList, overflowData = node.tcp_dec_struct(overflowData)
-
-			if structTypeList == nil && structDataList == nil && overflowData == "DISCONNECTED" {
-				node.inbox <- "DISCONNECTED"
-				return
-			}
-
-			for i, structType := range structTypeList {
-				structData := structDataList[i]
-
-				// NOTE: Couldn't put the following code in tcp_dec_struct() function because functions needed concrete return types and interfaces weren't working
-				// TODO convert to case statement
-				if structType == "main.ConnectionMessage" {
-					m := new(ConnectionMessage)
-					err := json.Unmarshal([]byte(structData), m)
-					check(err)
-					node.inbox <- *m
-				} else if structType == "main.TransactionMessage" {
-					m := new(TransactionMessage)
-					err := json.Unmarshal([]byte(structData), m)
-					check(err)
-					node.inbox <- *m
-				} else if structType == "main.DiscoveryMessage" {
-					m := new(DiscoveryMessage)
-					err := json.Unmarshal([]byte(structData), m)
-					check(err)
-					node.inbox <- *m
-				} else if structType == "main.TransactionRequest" {
-					m := new(TransactionRequest)
-					err := json.Unmarshal([]byte(structData), m)
-					check(err)
-					node.inbox <- *m
-				} else {
-					panic("\n ERROR receive_incoming_data type: " + structType)
-				}
-			}
-		}
-	*/
+	Warning.Println("Closing inbox for node", node.nodeName)
 }
 
 func (node *nodeComm) configureGossipProtocol() {
