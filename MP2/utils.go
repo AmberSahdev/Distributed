@@ -166,3 +166,14 @@ func debug_print_transactions() {
 		// }
 	}
 }
+
+func (node *nodeComm) check_node_status() bool {
+	neighborMapMutex.Lock()
+	if _, exists := neighborMap[node.nodeName]; !exists {
+		fmt.Println("\nDisconnected ", node.nodeName)
+		neighborMapMutex.Unlock()
+		return false
+	}
+	neighborMapMutex.Unlock()
+	return true
+}
