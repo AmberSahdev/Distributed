@@ -42,20 +42,20 @@ func blockchain() {
 	//    propogate new blocks to your neighbors
 }
 
-func askProofOfWork(b Block) {
+func askProofOfWork(b *Block) {
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%v", b)))
+	h.Write([]byte(fmt.Sprintf("%v", *b)))
 
 	hash := fmt.Sprintf("%x", h.Sum(nil))
 	serviceMsg := "SOLVE " + hash + "\n"
 	mp2Service.outbox <- serviceMsg
 }
 
-func askVerifyBlock(b Block) {
+func askVerifyBlock(b *Block) {
 	// remove the proof of work
 	bNew := new(Block)
 	*bNew = *b
-	*bNew.BlockID = ""
+	bNew.BlockID = ""
 
 	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("%v", bNew)))
@@ -66,12 +66,12 @@ func askVerifyBlock(b Block) {
 	mp2Service.outbox <- serviceMsg
 }
 
-func deleteDuplicateTransactions(b Block) {
+func deleteDuplicateTransactions(b *Block) {
 	var toDelete []TransID
 	transactionMutex.Lock()
 	for _, transaction := range b.Transactions {
 		// remove from transactionMap
-		val, exists := transactionMap[transaction.TransactionID]
+		_, exists := transactionMap[transaction.TransactionID]
 		if exists {
 			delete(transactionMap, transaction.TransactionID)
 			toDelete = append(toDelete, transaction.TransactionID)

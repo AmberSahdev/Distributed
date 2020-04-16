@@ -29,7 +29,7 @@ type ConnectionMessage struct { // Ex: INTRODUCE node2 172.22.156.3 4567
 
 type TransactionMessage struct { // Ex: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 	Timestamp     float64
-	TransactionID []byte // [TransID] // 128-bit unique transaction ID
+	TransactionID TransID // 128-bit unique transaction ID
 	Src           AccountID
 	Dest          AccountID
 	Amount        uint64
