@@ -162,11 +162,11 @@ func handleServiceComms(mp2ServiceAddr string) {
 				node := new(nodeComm)
 				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
-				connectToNode(node) // TODO: do handle node comms inside this routine
+				connectToNode(node)
 				neighborMapMutex.Lock()
 				neighborMap[node.nodeName] = node
 				neighborMapMutex.Unlock()
-				go node.handleNodeComm()
+				go node.handleNodeComm(nil)
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
 				// TODO: impelment a better quit or die handler
 				Error.Println("QUIT or DIE received")
@@ -216,8 +216,8 @@ func handleIncomingConns() {
 	check(err)
 	for err == nil {
 		conn, err = listener.Accept()
-		node := setupNeighbor(conn)
-		go node.handleNodeComm() // open up a go routine
+		node, tcpDec := setupNeighbor(conn)
+		go node.handleNodeComm(tcpDec) // open up a go routine
 	}
 	_ = listener.Close()
 	Error.Println("Stopped listening because of error")
