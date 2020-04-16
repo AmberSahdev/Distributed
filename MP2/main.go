@@ -33,6 +33,7 @@ var mp2Service nodeComm
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
 var transactionMap map[TransID]int
 
+var curNeighborToPoll int
 var neighborMap map[string]*nodeComm
 var neighborList []*nodeComm
 
@@ -60,13 +61,16 @@ func main() {
 	Info.Println("Found local IP to be " + localIPaddr)
 	localPort = arguments[2]
 	numConns = 0
+	curNeighborToPoll = 0
 	mp2ServiceAddr := parseServiceTextfile("serviceAddr.txt")[0]
 	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
 	transactionMap = make(map[TransID]int)
 	blockMap = make(map[BlockID]int)
 	nodeMap = make(map[string]int)
+	neighborMap = make(map[string]*nodeComm)
+
 	nodeMap[localNodeName] = 0 // to avoid future errors
-	nodeList = make([]*ConnectionMessage, 5)
+	nodeList = make([]*ConnectionMessage, 0)
 	myConn := new(ConnectionMessage)
 	*myConn = ConnectionMessage{
 		NodeName: localNodeName,
@@ -109,6 +113,7 @@ func initGob() {
 	gob.Register(TransactionMessage{})
 	gob.Register(DiscoveryMessage{})
 	gob.Register(TransactionRequest{})
+	gob.Register(DiscoveryReplyMessage{})
 }
 
 // Get preferred outbound ip of this machine

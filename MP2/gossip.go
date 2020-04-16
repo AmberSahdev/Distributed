@@ -117,19 +117,19 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
 			if m.Request {
 				nodeMutex.RLock()
-				nodesPendingTransmission := make([]string, len(nodeList)-1-lastSentNodeIndex)
+				nodesPendingTransmission := make([]string, 0)
 				for ; lastSentNodeIndex < len(nodeList)-1; lastSentNodeIndex++ {
 					nodesPendingTransmission = append(nodesPendingTransmission, nodeList[lastSentNodeIndex+1].NodeName)
 				}
 				nodeMutex.RUnlock()
 				blockMutex.RLock()
-				blocksPendingTransmission := make([]BlockID, len(blockList)-1-lastSentBlockIndex)
+				blocksPendingTransmission := make([]BlockID, 0)
 				for ; lastSentBlockIndex < len(blockList)-1; lastSentBlockIndex++ {
 					blocksPendingTransmission = append(blocksPendingTransmission, blockList[lastSentBlockIndex+1].blockID)
 				}
 				blockMutex.RUnlock()
 				transactionMutex.RLock()
-				transactionsPendingTransmission := make([]TransID, len(transactionList)-1-lastSentTransactionIndex)
+				transactionsPendingTransmission := make([]TransID, 0)
 				for ; lastSentTransactionIndex < len(transactionList)-1; lastSentTransactionIndex++ {
 					transactionsPendingTransmission = append(transactionsPendingTransmission, transactionList[lastSentTransactionIndex+1].TransactionID)
 				}
@@ -228,8 +228,8 @@ func configureGossipProtocol() {
 	//     - send transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
 	for {
-		rand := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
-		// pollANeighbor() // TODO: Polls a Neighbor (iterate over connectedNodes in order)
+		rand := time.Duration(rand.Intn(500))                 // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+		pollANeighbor()                                       // TODO: Polls a Neighbor (iterate over connectedNodes in order)
 		time.Sleep((POLLINGPERIOD + rand) * time.Millisecond) //TODO: Tune Polling Period
 		correctNumNeighbors()                                 //TODO: checks if number of Neighbors is too low, if so, randomly connect to a node from nodeList not in neighborMap
 	}
@@ -239,9 +239,29 @@ func correctNumNeighbors() {
 	nodeMutex.RLock()
 	numNodes := len(nodeList) - 1 // index 0 is US!
 	nodeMutex.RUnlock()
-	desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes))+2)))
+	desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes))))+2)
 	if desiredNumConnections < numConns {
 		Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
-		// TODO: connect to 1 of remaining nodes randomly
+		// TODO: successfully connect to 1 of remaining nodes randomly from nodeList
+	}
+}
+
+func pollANeighbor() {
+	if len(neighborList) > 0 {
+		m := new(DiscoveryMessage)
+		*m = DiscoveryMessage{true}
+
+		for {
+			neighborMutex.RLock()
+			curNeighborToPoll %= len(neighborList)
+			if neighborList[curNeighborToPoll] != nil {
+				neighborList[curNeighborToPoll].outbox <- *m
+				neighborMutex.RUnlock()
+				curNeighborToPoll++
+				break
+			}
+			neighborMutex.RUnlock()
+			curNeighborToPoll++
+		}
 	}
 }

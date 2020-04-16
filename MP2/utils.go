@@ -37,21 +37,24 @@ func connectToNode(node *nodeComm) {
 	node.outbox = make(chan Message, 65536)
 	node.conn, err = net.Dial("tcp", node.address)
 	check(err) // TODO: maybe dont crash here IMPORTANT!!!
-	m := new(Message)
+	m := new(ConnectionMessage)
 	*m = ConnectionMessage{
 		NodeName: localNodeName,
 		IPaddr:   localIPaddr,
 		Port:     localPort,
 	}
 	node.outbox <- *m
+	nodeMutex.Lock()
+	nodeList = append(nodeList, m)
+	nodeMutex.Unlock()
 }
 
 func addTransaction(m TransactionMessage) {
 	newM := new(TransactionMessage)
 	*newM = m
 	transactionMutex.Lock()
-	transactionList = append(transactionList, newM)
 	transactionMap[m.TransactionID] = len(transactionList)
+	transactionList = append(transactionList, newM)
 	transactionMutex.Unlock()
 }
 
@@ -91,7 +94,7 @@ func debugPrintTransactions() {
 func addNeighbor(newNode *nodeComm) {
 	numConns++
 	neighborMap[newNode.nodeName] = newNode
-	neighborList = neighborList
+	neighborList = append(neighborList, newNode)
 }
 
 func removeNeighbor(node *nodeComm) {
