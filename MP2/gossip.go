@@ -8,10 +8,10 @@ import (
 )
 
 /**************************** Setup Functions ****************************/
-func setup_neighbor(conn net.Conn) *nodeComm {
-	// Called when a neighbor is trying to connect to this node
+func setupNeighbor(conn net.Conn) *nodeComm {
+	// Called when a new Node is trying to connect to this node
 	tcpDec := gob.NewDecoder(conn)
-	var incoming interface{}
+	var incoming Message
 	err := tcpDec.Decode(&incoming)
 	check(err)
 	switch m := incoming.(type) {
@@ -23,7 +23,6 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 		node.conn = conn
 		node.inbox = make(chan Message, 65536)
 		node.outbox = make(chan Message, 65536)
-		// node.isConnected = true
 		Info.Println("setup_neighbor", m.NodeName)
 		neighborMapMutex.Lock()
 		neighborMap[m.NodeName] = node
@@ -37,7 +36,7 @@ func setup_neighbor(conn net.Conn) *nodeComm {
 
 /**************************** Go Routines ****************************/
 // TODO: create a dedicated TCP thread for doing all the outgoing communications and push to it via an outbox channel
-func (node *nodeComm) handle_outgoing_messages() {
+func (node *nodeComm) handleOutgoingMessages() {
 	tcpEnc := gob.NewEncoder(node.conn)
 	var m Message
 	for m = range node.outbox {
@@ -52,12 +51,12 @@ func (node *nodeComm) handle_outgoing_messages() {
 
 func pollNeighbors() { // TODO: push to all outboxes
 	// when called, ask neighbors about their neghbors
-	m := new(DiscoveryMessage)
-	*m = DiscoveryMessage{true}
+	m := new(Message)
+	*m = Message(DiscoveryMessage{true})
 	// TODO: Make this Mutex RW lock
 	neighborMapMutex.Lock()
-	for _, node := range neighborMap {
-		if node.isConnected {
+	for nodeName, node := range neighborMap {
+		if nodeName != localNodeName && node.isConnected {
 			node.outbox <- m
 		}
 	}
@@ -66,9 +65,10 @@ func pollNeighbors() { // TODO: push to all outboxes
 
 func (node *nodeComm) handleNodeComm() {
 	Info.Println("Start handleNodeComm for ", node.nodeName)
+
 	// handles all logic for communication between nodes
 	go node.receiveIncomingData() // put messages of this conn into node.inbox
-	go node.handle_outgoing_messages()
+	go node.handleOutgoingMessages()
 
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
@@ -78,7 +78,9 @@ func (node *nodeComm) handleNodeComm() {
 		switch m := val.(type) {
 		case ConnectionMessage:
 			neighborMapMutex.Lock()
-			if _, exists := neighborMap[m.NodeName]; !exists {
+			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
+
+				Error.Println("How Did we get here?")
 				newNode := new(nodeComm)
 				newNode.nodeName = m.NodeName
 				newNode.address = m.IPaddr + ":" + m.Port
@@ -87,9 +89,10 @@ func (node *nodeComm) handleNodeComm() {
 				newNode.isConnected = true
 				neighborMap[newNode.nodeName] = newNode
 				neighborMapMutex.Unlock()
-				connectToNode(newNode)
-				go newNode.handleNodeComm() // TODO: do this inside connect to node
+				go newNode.handleNodeComm()
 			} else {
+				// 2-way communication now established
+				incomingNode.isConnected = true
 				neighborMapMutex.Unlock()
 			}
 
@@ -184,10 +187,10 @@ func (node *nodeComm) receiveIncomingData() {
 	}
 	node.inbox <- "DISCONNECTED"
 	close(node.inbox)
-	Warning.Println("Closing inbox for node", node.nodeName)
+	Warning.Println("Closing inbox for node", node.nodeName, "Cause:", err)
 }
 
-func (node *nodeComm) configureGossipProtocol() {
+func configureGossipProtocol() {
 	//   one per NodeComm
 	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
 	//   handle messages of the following type:

@@ -29,7 +29,7 @@ var numConns uint8                   // tracks number of other nodes connected t
 var localIPaddr string
 var localPort string
 
-var mp2ServiceAddr string
+var mp2Service nodeComm
 
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
 var transactionMap map[TransID]*TransactionMessage
@@ -52,7 +52,7 @@ func main() {
 	Info.Println("Found local IP to be " + localIPaddr)
 	localPort = arguments[2]
 
-	mp2ServiceAddr = parseServiceTextfile("serviceAddr.txt")[0]
+	mp2ServiceAddr := parseServiceTextfile("serviceAddr.txt")[0]
 	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
 	transactionMap = make(map[TransID]*TransactionMessage)
 
@@ -64,6 +64,8 @@ func main() {
 	transactionListMutex = sync.Mutex{}
 
 	go listen_for_conns()
+
+	go configureGossipProtocol()
 
 	go debugPrintTransactions() // TODO: remove later
 
@@ -116,7 +118,6 @@ func parseServiceTextfile(path string) []string {
 /**************************** Go Routines ****************************/
 func handle_service_comms(mp2ServiceAddr string) {
 	var err error = nil
-	mp2Service := new(nodeComm)
 	mp2Service.nodeName = "mp2Service"
 	mp2Service.address = mp2ServiceAddr
 	mp2Service.inbox = make(chan Message, 65536)
@@ -124,9 +125,6 @@ func handle_service_comms(mp2ServiceAddr string) {
 	mp2Service.isConnected = true
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
-	neighborMapMutex.Lock()
-	neighborMap["mp2Service"] = mp2Service
-	neighborMapMutex.Unlock()
 	mp2Service.outbox <- "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
 	go handle_service_sending()
 	go handle_service_receiving()
@@ -155,7 +153,7 @@ func handle_service_comms(mp2ServiceAddr string) {
 				//fmt.Println("received mp2_service transaction")
 				var transactionID TransID
 				mp2ServiceMsgArr := strings.Split(mp2ServiceMsg, " ")
-				transactiontime, err := strconv.ParseFloat(mp2ServiceMsgArr[1], 64)
+				transactionTime, err := strconv.ParseFloat(mp2ServiceMsgArr[1], 64)
 				check(err)
 				transactionIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
 				check(err)
@@ -167,7 +165,7 @@ func handle_service_comms(mp2ServiceAddr string) {
 				check(err)
 				transaction := new(TransactionMessage)
 				copy(transactionID[:], transactionIDSlice[:TranSize])
-				*transaction = TransactionMessage{transactiontime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
+				*transaction = TransactionMessage{transactionTime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
 				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
 				// TODO: impelment a better quit or die handler
@@ -182,9 +180,6 @@ func handle_service_comms(mp2ServiceAddr string) {
 }
 
 func handle_service_sending() {
-	neighborMapMutex.Lock()
-	mp2Service := neighborMap["mp2Service"]
-	neighborMapMutex.Unlock()
 	for incomingMsg := range mp2Service.outbox {
 		switch m := incomingMsg.(type) {
 		case string:
@@ -202,9 +197,6 @@ func handle_service_sending() {
 }
 
 func handle_service_receiving() {
-	neighborMapMutex.Lock()
-	mp2Service := neighborMap["mp2Service"]
-	neighborMapMutex.Unlock()
 	buf := make([]byte, 65536) // Make a buffer to hold incoming data
 	for {
 		msglen, err := mp2Service.conn.Read(buf)
@@ -224,7 +216,7 @@ func listen_for_conns() {
 	check(err)
 	for err == nil {
 		conn, err = listener.Accept()
-		node := setup_neighbor(conn)
+		node := setupNeighbor(conn)
 		go node.handleNodeComm() // open up a go routine
 	}
 	_ = listener.Close()

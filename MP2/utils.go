@@ -40,11 +40,11 @@ func connectToNode(node *nodeComm) {
 	check(err) // TODO: maybe dont crash here
 	tcpEnc := gob.NewEncoder(node.conn)
 	m := new(Message)
-	*m = ConnectionMessage{
+	*m = Message(ConnectionMessage{
 		NodeName: localNodeName,
 		IPaddr:   localIPaddr,
 		Port:     localPort,
-	}
+	})
 	// fmt.Println("connect_to_node \t ", m)
 	err = tcpEnc.Encode(m)
 	check(err)
