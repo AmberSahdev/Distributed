@@ -5,8 +5,11 @@ import (
 	"fmt"
 )
 
-var localBlockHeight uint64
 var chain []Block
+var previousBlockID string // var localBlockHeight uint64
+
+var blockParentMap map[string]string
+var blockMap map[string]*Block
 
 func blockchain() {
 	// ask neighbors about their blockchain status,
@@ -92,4 +95,9 @@ func deleteDuplicateTransactions(b *Block) {
 
 func resetCurrentIndexPointers() {
 	// TODO: go through all nodes and reset their CurrentIndexPointers to 0
+}
+
+func findFork() {
+	// find the fork in the blockchain
+	//
 }
