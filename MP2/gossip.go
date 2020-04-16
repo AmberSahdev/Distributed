@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"math"
 	"math/rand"
 	"net"
 	"reflect"
@@ -27,9 +28,9 @@ func setupNeighbor(conn net.Conn) (*nodeComm, *gob.Decoder) {
 		node.inbox = make(chan Message, 65536)
 		node.outbox = make(chan Message, 65536)
 		Info.Println("setup_neighbor", m.NodeName)
-		neighborMapMutex.Lock()
-		neighborMap[m.NodeName] = node
-		neighborMapMutex.Unlock()
+		neighborMutex.Lock()
+		addNeighbor(node)
+		neighborMutex.Unlock()
 		return node, tcpDec
 	default:
 		Error.Println("Got unexpected type as first messge:", incoming)
@@ -55,18 +56,19 @@ func (node *nodeComm) handleOutgoingMessages() {
 	}
 }
 
-func pollNeighbors() { // TODO: push to all outboxes
+// TODO: Remove this as it is unnecessary
+func pollNeighbors() {
 	// when called, ask neighbors about their neghbors
 	m := new(DiscoveryMessage)
 	*m = DiscoveryMessage{true}
 	// TODO: Make this Mutex RW lock
-	neighborMapMutex.Lock()
+	neighborMutex.RLock()
 	for nodeName, node := range neighborMap {
 		if nodeName != localNodeName && node.isConnected {
 			node.outbox <- *m
 		}
 	}
-	neighborMapMutex.Unlock()
+	neighborMutex.RUnlock()
 }
 
 func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
@@ -79,12 +81,14 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
 	// TODO: make lastSentTransactionIndex part of the node struct so you can easily reset it
-	lastSentTransactionIndex := 0 // to send only new transactionIDs, need to keep track of last sent index
+	lastSentTransactionIndex := -1 // to send only new transactionIDs, need to keep track of last sent index
+	lastSentBlockIndex := -1       // to send only new blocks, need to keep track of last sent index
+	lastSentNodeIndex := -1        // to send only new nodes, need to keep track of last sent index
 
 	for val := range node.inbox {
 		switch m := val.(type) {
 		case ConnectionMessage:
-			neighborMapMutex.Lock()
+			neighborMutex.Lock()
 			Info.Println("Processing Connection Message:", m, "from", node.nodeName)
 			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
 
@@ -96,34 +100,43 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				newNode.inbox = make(chan Message, 65536)
 				newNode.outbox = make(chan Message, 65536)
 				newNode.isConnected = true
-				neighborMap[newNode.nodeName] = newNode
-				neighborMapMutex.Unlock()
+				addNeighbor(newNode)
+				neighborMutex.Unlock()
 				go newNode.handleNodeComm(nil)
 			} else {
 				// 2-way communication now established
 				incomingNode.isConnected = true
-				neighborMapMutex.Unlock()
+				neighborMutex.Unlock()
 			}
 
 		case TransactionMessage:
-			Info.Println("exchanged transaction, from ", node.nodeName)
+			Info.Println("Received transaction", m, "from", node.nodeName)
 			addTransaction(m)
 
 		case DiscoveryMessage:
 			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
 			if m.Request {
-				// send 5 random neighbors (first 5 neighbors)
-				numNeighborsSend := min(5, len(neighborMap))
-				i := 0
-				for k, v := range neighborMap {
-					if k == "mp2Service" || k == localNodeName || k == node.nodeName {
-						continue
-					} else if i == numNeighborsSend {
-						break
-					}
-					node.outbox <- *nodecommToConnectionmessage(v)
-					i++
+				nodeMutex.RLock()
+				nodesPendingTransmission := make([]string, len(nodeList)-1-lastSentNodeIndex)
+				for ; lastSentNodeIndex < len(nodeList)-1; lastSentNodeIndex++ {
+					nodesPendingTransmission = append(nodesPendingTransmission, nodeList[lastSentNodeIndex+1].NodeName)
 				}
+				nodeMutex.RUnlock()
+				blockMutex.RLock()
+				blocksPendingTransmission := make([]BlockID, len(blockList)-1-lastSentBlockIndex)
+				for ; lastSentBlockIndex < len(blockList)-1; lastSentBlockIndex++ {
+					blocksPendingTransmission = append(blocksPendingTransmission, blockList[lastSentBlockIndex+1].blockID)
+				}
+				blockMutex.RUnlock()
+				transactionMutex.RLock()
+				transactionsPendingTransmission := make([]TransID, len(transactionList)-1-lastSentTransactionIndex)
+				for ; lastSentTransactionIndex < len(transactionList)-1; lastSentTransactionIndex++ {
+					transactionsPendingTransmission = append(transactionsPendingTransmission, transactionList[lastSentTransactionIndex+1].TransactionID)
+				}
+				transactionMutex.RUnlock()
+				response := new(DiscoveryReplyMessage)
+				*response = DiscoveryReplyMessage{nodesPendingTransmission, blocksPendingTransmission, transactionsPendingTransmission}
+				node.outbox <- *response
 			} else {
 				panic("ERROR received DiscoveryMessage with request false")
 			}
@@ -177,10 +190,10 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 		default:
 			if m == "DISCONNECTED" || m == nil {
 				node.conn.Close()
-				neighborMapMutex.Lock()
 				node.isConnected = false
-				delete(neighborMap, node.nodeName) // TODO: track disconnected node using variable not map
-				neighborMapMutex.Unlock()
+				neighborMutex.Lock()
+				removeNeighbor(node)
+				neighborMutex.Unlock()
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
@@ -214,10 +227,21 @@ func configureGossipProtocol() {
 	//     - send pull request
 	//     - send transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
+	for {
+		rand := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+		// pollANeighbor() // TODO: Polls a Neighbor (iterate over connectedNodes in order)
+		time.Sleep((POLLINGPERIOD + rand) * time.Millisecond) //TODO: Tune Polling Period
+		correctNumNeighbors()                                 //TODO: checks if number of Neighbors is too low, if so, randomly connect to a node from nodeList not in neighborMap
+	}
+}
 
-	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
-	//rand := time.Duration(0) // for stress test debugging purposes
-	time.Sleep((POLLINGPERIOD + rand) * time.Second)
-	pollNeighbors()
-
+func correctNumNeighbors() {
+	nodeMutex.RLock()
+	numNodes := len(nodeList) - 1 // index 0 is US!
+	nodeMutex.RUnlock()
+	desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes))+2)))
+	if desiredNumConnections < numConns {
+		Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
+		// TODO: connect to 1 of remaining nodes randomly
+	}
 }

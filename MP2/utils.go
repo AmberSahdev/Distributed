@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"net"
 	"strings"
 	"time"
@@ -34,7 +35,6 @@ func connectToNode(node *nodeComm) {
 	var err error
 	node.inbox = make(chan Message, 65536)
 	node.outbox = make(chan Message, 65536)
-	node.isConnected = true
 	node.conn, err = net.Dial("tcp", node.address)
 	check(err) // TODO: maybe dont crash here IMPORTANT!!!
 	m := new(Message)
@@ -49,23 +49,20 @@ func connectToNode(node *nodeComm) {
 func addTransaction(m TransactionMessage) {
 	newM := new(TransactionMessage)
 	*newM = m
-	transactionListMutex.Lock()
-	transactionList = append(transactionList, newM) // TODO: make it more efficient
-	transactionListMutex.Unlock()
-
-	transactionMapMutex.Lock()
-	transactionMap[m.TransactionID] = newM // can't assume what's in the list is in the map.
-	transactionMapMutex.Unlock()
+	transactionMutex.Lock()
+	transactionList = append(transactionList, newM)
+	transactionMap[m.TransactionID] = len(transactionList)
+	transactionMutex.Unlock()
 }
 
 // Find takes a slice and looks for an element in it. If found it will
 // return it's key, otherwise it will return -1 and a bool of false.
 func findTransaction(key TransID) (bool, *TransactionMessage) {
-	transactionMapMutex.Lock()
-	val, exists := transactionMap[key]
-	transactionMapMutex.Unlock()
-	if exists {
-		return true, val
+	transactionMutex.RLock()
+	defer transactionMutex.RUnlock()
+	ind, exists := transactionMap[key]
+	if exists && ind != math.MaxInt64 {
+		return true, transactionList[ind]
 	} else {
 		return false, nil
 	}
@@ -91,12 +88,20 @@ func debugPrintTransactions() {
 	}
 }
 
-func (node *nodeComm) checkNodeStatus() bool {
-	neighborMapMutex.Lock()
-	defer neighborMapMutex.Unlock()
-	if _, exists := neighborMap[node.nodeName]; !exists {
-		Warning.Println("\nDisconnected ", node.nodeName)
-		return false
+func addNeighbor(newNode *nodeComm) {
+	numConns++
+	neighborMap[newNode.nodeName] = newNode
+	neighborList = neighborList
+}
+
+func removeNeighbor(node *nodeComm) {
+	numConns--
+	delete(neighborMap, node.nodeName)
+	for ind, curNode := range neighborList {
+		if curNode != nil && curNode.nodeName == node.nodeName {
+			neighborList[ind] = nil
+			return
+		}
 	}
-	return true
+	Error.Println("Failed to delete", node.nodeName, "from neighborList!")
 }

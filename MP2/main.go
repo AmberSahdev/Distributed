@@ -20,23 +20,32 @@ var (
 	Error   *log.Logger
 )
 
-const MAXNEIGHBORS = 12              // probably too high
-const POLLINGPERIOD = 10             // poll neighbors for their neighbors, transactions every POLLINGPERIOD*2 seconds
-const TranSize = 16                  // transactionID Size in bytes (128 bit IDs)
-var localNodeName string             // tracks local node's name
-var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
-var numConns uint8                   // tracks number of other nodes connected to this node for bookkeeping
+const POLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
+const TranSize = 16        // transactionID Size in bytes (128 bit IDs)
+var localNodeName string   // tracks local node's name
+var numConns int
+
 var localIPaddr string
 var localPort string
 
 var mp2Service nodeComm
 
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
-var transactionMap map[TransID]*TransactionMessage
+var transactionMap map[TransID]int
 
-var neighborMapMutex sync.Mutex
-var transactionMapMutex sync.Mutex
-var transactionListMutex sync.Mutex
+var neighborMap map[string]*nodeComm
+var neighborList []*nodeComm
+
+var nodeMap map[string]int
+var nodeList []*ConnectionMessage
+
+var blockMap map[BlockID]int
+var blockList []*Block
+
+var nodeMutex sync.RWMutex
+var neighborMutex sync.RWMutex
+var transactionMutex sync.RWMutex
+var blockMutex sync.RWMutex
 
 func main() {
 	initLogging(os.Stdout, os.Stdout, os.Stderr)
@@ -46,22 +55,29 @@ func main() {
 		Error.Println("Expected Format: ./gossip [Local Node Name] [port]")
 		return
 	}
-	numConns = 0
 	localNodeName = arguments[1]
 	localIPaddr = GetOutboundIP()
 	Info.Println("Found local IP to be " + localIPaddr)
 	localPort = arguments[2]
-
+	numConns = 0
 	mp2ServiceAddr := parseServiceTextfile("serviceAddr.txt")[0]
 	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
-	transactionMap = make(map[TransID]*TransactionMessage)
-
-	neighborMap = make(map[string]*nodeComm)
-	neighborMap[localNodeName] = nil // To avoid future errors
-
-	neighborMapMutex = sync.Mutex{}
-	transactionMapMutex = sync.Mutex{}
-	transactionListMutex = sync.Mutex{}
+	transactionMap = make(map[TransID]int)
+	blockMap = make(map[BlockID]int)
+	nodeMap = make(map[string]int)
+	nodeMap[localNodeName] = 0 // to avoid future errors
+	nodeList = make([]*ConnectionMessage, 5)
+	myConn := new(ConnectionMessage)
+	*myConn = ConnectionMessage{
+		NodeName: localNodeName,
+		IPaddr:   localIPaddr,
+		Port:     localPort,
+	}
+	nodeList = append(nodeList, myConn)
+	nodeMutex = sync.RWMutex{}
+	transactionMutex = sync.RWMutex{}
+	blockMutex = sync.RWMutex{}
+	neighborMutex = sync.RWMutex{}
 
 	go handleIncomingConns()
 
@@ -163,9 +179,9 @@ func handleServiceComms(mp2ServiceAddr string) {
 				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
 				connectToNode(node)
-				neighborMapMutex.Lock()
-				neighborMap[node.nodeName] = node
-				neighborMapMutex.Unlock()
+				neighborMutex.Lock()
+				addNeighbor(node)
+				neighborMutex.Unlock()
 				go node.handleNodeComm(nil)
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
 				// TODO: impelment a better quit or die handler

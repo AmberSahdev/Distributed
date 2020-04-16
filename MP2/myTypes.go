@@ -10,6 +10,8 @@ type TransID [TranSize]byte
 
 type AccountID uint32
 
+type BlockID [sha256.Size]byte
+
 type nodeComm struct {
 	nodeName    string
 	address     string // neighboring node's address:port string
@@ -44,6 +46,12 @@ type DiscoveryMessage struct {
 	//NeighborAddresses []ConnectionMessage // list of node's address:port string
 }
 
+type DiscoveryReplyMessage struct {
+	NodesPendingTransmission        []string
+	BlocksPendingTransmission       []BlockID
+	TransactionsPendingTransmission []TransID
+}
+
 type TransactionRequest struct {
 	// if request = true && len(TransactionIDs) == 0, send back all TransactionIDs (TODO: store index of last sent TransactionID)
 	// if request = true && len(TransactionIDs) != 0, TransactionIDs has a list of TransactionIDs you need to send TransactionMessages of
@@ -55,8 +63,8 @@ type TransactionRequest struct {
 
 /********************************* Blockchain *********************************/
 type Block struct {
-	blockID         [sha256.Size]byte
+	blockID         BlockID
 	transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
-	parentBlockID   [sha256.Size]byte
+	parentBlockID   BlockID
 	accountBalances map[AccountID]uint64
 }
