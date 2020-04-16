@@ -67,7 +67,7 @@ func main() {
 
 	go configureGossipProtocol()
 
-	go debugPrintTransactions() // TODO: remove later
+	// go debugPrintTransactions() // TODO: remove later
 
 	handleServiceComms(mp2ServiceAddr)
 }

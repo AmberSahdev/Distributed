@@ -46,6 +46,7 @@ func (node *nodeComm) handleOutgoingMessages() {
 		sendMsg := new(Message)
 		*sendMsg = m
 		err := tcpEnc.Encode(sendMsg)
+		Info.Println("Sending", *sendMsg, "to", node.nodeName)
 		if err != nil {
 			Error.Println("Failed to send Message, receiver down?")
 			_ = node.conn.Close()
@@ -56,8 +57,8 @@ func (node *nodeComm) handleOutgoingMessages() {
 
 func pollNeighbors() { // TODO: push to all outboxes
 	// when called, ask neighbors about their neghbors
-	m := new(Message)
-	*m = Message(DiscoveryMessage{true})
+	m := new(DiscoveryMessage)
+	*m = DiscoveryMessage{true}
 	// TODO: Make this Mutex RW lock
 	neighborMapMutex.Lock()
 	for nodeName, node := range neighborMap {
@@ -84,6 +85,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 		switch m := val.(type) {
 		case ConnectionMessage:
 			neighborMapMutex.Lock()
+			Info.Println("Processing Connection Message:", m, "from", node.nodeName)
 			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
 
 				// TODO: you never opened the conn
@@ -108,6 +110,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			addTransaction(m)
 
 		case DiscoveryMessage:
+			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
 			if m.Request {
 				// send 5 random neighbors (first 5 neighbors)
 				numNeighborsSend := min(5, len(neighborMap))
@@ -118,9 +121,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 					} else if i == numNeighborsSend {
 						break
 					}
-					newMsg := new(Message)
-					*newMsg = Message(*nodecommToConnectionmessage(v))
-					node.outbox <- *newMsg
+					node.outbox <- *nodecommToConnectionmessage(v)
 					i++
 				}
 			} else {
@@ -128,6 +129,8 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			}
 
 		case TransactionRequest:
+			Info.Println("Processing Transaction Request:", m, "from", node.nodeName)
+
 			// TODO: revist after blockchain discussion
 			if m.Request == true && len(m.TransactionIDs) == 0 {
 				// send all your TransactionIDs
@@ -140,7 +143,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 					j++
 				}
 				msg := new(Message)
-				*msg = Message(TransactionRequest{false, TransactionIDs})
+				*msg = TransactionRequest{false, TransactionIDs}
 				node.outbox <- *msg
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
@@ -167,7 +170,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 						}
 					}
 					msg := new(Message)
-					*msg = Message(TransactionRequest{true, newTransactionIDs})
+					*msg = TransactionRequest{true, newTransactionIDs}
 					node.outbox <- *msg
 				}
 			}
@@ -195,7 +198,8 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 	for err == nil {
 		newM := new(Message)
 		err = tcpDec.Decode(newM)
-		node.inbox <- newM
+		Info.Println("Received", *newM, "from", node.nodeName)
+		node.inbox <- *newM
 	}
 	node.inbox <- "DISCONNECTED"
 	close(node.inbox)
