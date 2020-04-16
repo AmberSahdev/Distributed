@@ -230,10 +230,10 @@ func configureGossipProtocol() {
 	//     - send transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
 	for {
-		rand := time.Duration(rand.Intn(500))                 // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
-		pollANeighbor()                                       // TODO: Polls a Neighbor (iterate over connectedNodes in order)
-		time.Sleep((POLLINGPERIOD + rand) * time.Millisecond) //TODO: Tune Polling Period
-		correctNumNeighbors()                                 //TODO: checks if number of Neighbors is too low, if so, randomly connect to a node from nodeList not in neighborMap
+		randVal := time.Duration(rand.Intn(500))                 // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+		pollANeighbor()                                          // TODO: Polls a Neighbor (iterate over connectedNodes in order)
+		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
+		correctNumNeighbors()                                    //TODO: checks if number of Neighbors is too low, if so, randomly connect to a node from nodeList not in neighborMap
 	}
 }
 
