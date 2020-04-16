@@ -63,15 +63,10 @@ func main() {
 	transactionListMutex = sync.Mutex{}
 
 	go listen_for_conns()
-	connect_to_service()
-	go handle_service_comms()
 
 	go debug_print_transactions() // TODO: remove later
 
-	// handle the ever updating list of transactions (do any kind of reordering, maintenance work here)
-	go blockchain()
-	for {
-	}
+	handle_service_comms(mp2ServiceAddr)
 }
 
 /**************************** Setup Functions ****************************/
@@ -117,69 +112,99 @@ func parseServiceTextfile(path string) []string {
 	return strings.Split(string(dat), "\n")
 }
 
-func connect_to_service() {
-	// Connect to mp2_service.py (over TCP)
+/**************************** Go Routines ****************************/
+func handle_service_comms(mp2ServiceAddr string) {
 	var err error = nil
 	mp2Service := new(nodeComm)
-
 	mp2Service.nodeName = "mp2Service"
 	mp2Service.address = mp2ServiceAddr
-	mp2Service.inbox = nil
-	mp2Service.outbox = nil
+	mp2Service.inbox = make(chan Message, 65536)
+	mp2Service.outbox = make(chan Message, 65536)
 	mp2Service.isConnected = true
-
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
 	neighborMapMutex.Lock()
 	neighborMap["mp2Service"] = mp2Service
 	neighborMapMutex.Unlock()
+	mp2Service.outbox <- "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
+	go handle_service_sending()
+	go handle_service_receiving()
+	for incomingMsg := range mp2Service.inbox {
+		// handle messages
+		//    1.1 Upto 3 INTRODUCE
+		//    1.2 TRANSACTION messages
+		//    1.3 QUIT/DIE
+		switch mp2ServiceMsg := incomingMsg.(type) {
+		case string:
+			msgType := strings.Split(mp2ServiceMsg, " ")[0]
+			// TODO: replace this with a case statement
+			if msgType == "INTRODUCE" {
+				// Example: INTRODUCE node2 172.22.156.3 4567
+				print(mp2ServiceMsg, "\n")
+				node := new(nodeComm)
+				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
+				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
+				connect_to_node(node) // TODO: do handle node comms inside this routine
+				neighborMapMutex.Lock()
+				neighborMap[node.nodeName] = node
+				neighborMapMutex.Unlock()
+				go node.handle_node_comm()
+			} else if msgType == "TRANSACTION" {
+				// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
+				//fmt.Println("received mp2_service transaction")
+				transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
+				transactionID := strings.Split(mp2ServiceMsg, " ")[2]
+				transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
+				transactionDest, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[4])
+				transactionAmt, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[5])
+				transaction := new(TransactionMessage)
+				*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
+				add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+			} else if (msgType == "QUIT") || (msgType == "DIE") {
+				// TODO: impelment a better quit or die handler
+				Error.Println("QUIT or DIE received")
+				panic(mp2ServiceMsg)
+			}
+		default:
+			Error.Println("Received non-string data from service")
+			panic(mp2ServiceMsg)
+		}
+	}
 }
 
-/**************************** Go Routines ****************************/
-func handle_service_comms() {
+func handle_service_sending() {
+	neighborMapMutex.Lock()
 	mp2Service := neighborMap["mp2Service"]
-	m := "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	Info.Printf("handle_service_comms \t type: %T\n", m)
-	_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
-	check(err)
+	neighborMapMutex.Unlock()
+	for incomingMsg := range mp2Service.outbox {
+		switch m := incomingMsg.(type) {
+		case string:
+			_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
+			if err != nil {
+				// attempt 1 retry, then give up
+				_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
+				check(err)
+			}
+		default:
+			Error.Println("Someone pushed Non-string value to service outbox")
+			panic(m)
+		}
+	}
+}
 
-	// handle messages
-	//    1.1 Upto 3 INTRODUCE
-	//    1.2 TRANSACTION messages
-	//    1.3 QUIT/DIE
+func handle_service_receiving() {
+	neighborMapMutex.Lock()
+	mp2Service := neighborMap["mp2Service"]
+	neighborMapMutex.Unlock()
 	buf := make([]byte, 65536) // Make a buffer to hold incoming data
 	for {
-		len, err := mp2Service.conn.Read(buf)
+		msglen, err := mp2Service.conn.Read(buf)
 		check(err)
-		mp2ServiceMsg := strings.Split(string(buf[:len]), "\n")[0]
-
-		msgType := strings.Split(mp2ServiceMsg, " ")[0]
-		if msgType == "INTRODUCE" {
-			// Example: INTRODUCE node2 172.22.156.3 4567
-			print(mp2ServiceMsg, "\n")
-			node := new(nodeComm)
-			node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
-			node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
-			connect_to_node(node) // TODO: do handle node comms inside this routine
-			neighborMapMutex.Lock()
-			neighborMap[node.nodeName] = node
-			neighborMapMutex.Unlock()
-			go node.handle_node_comm()
-		} else if msgType == "TRANSACTION" {
-			// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
-			//fmt.Println("received mp2_service transaction")
-			transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
-			transactionID := strings.Split(mp2ServiceMsg, " ")[2]
-			transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
-			transactionDest, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[4])
-			transactionAmt, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[5])
-			transaction := new(TransactionMessage)
-			*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
-			add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
-		} else if (msgType == "QUIT") || (msgType == "DIE") {
-			// TODO: impelment a better quit or die handler
-			Error.Println("QUIT or DIE received")
-			panic(mp2ServiceMsg)
+		mp2ServiceMsgs := strings.Split(string(buf[:msglen]), "\n")
+		for _, msg := range mp2ServiceMsgs {
+			if len(msg) > 0 {
+				mp2Service.inbox <- msg
+			}
 		}
 	}
 }
