@@ -53,13 +53,10 @@ type TransactionRequest struct {
 	TransactionIDs []TransID
 }
 
+/********************************* Blockchain *********************************/
 type Block struct {
-	// if request = true && len(TransactionIDs) == 0, send back all TransactionIDs (TODO: store index of last sent TransactionID)
-	// if request = true && len(TransactionIDs) != 0, TransactionIDs has a list of TransactionIDs you need to send TransactionMessages of
-	// if request = false, TransactionIDs has a list of TransactionIDs it has (TODO: make it new TransactionIDs)
-	//
 	blockID         [sha256.Size]byte
-	transactions    []TransactionMessage
+	transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
 	parentBlockID   [sha256.Size]byte
 	accountBalances map[AccountID]uint64
 }

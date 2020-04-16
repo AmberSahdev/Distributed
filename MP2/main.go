@@ -63,7 +63,7 @@ func main() {
 	transactionMapMutex = sync.Mutex{}
 	transactionListMutex = sync.Mutex{}
 
-	go listen_for_conns()
+	go handleIncomingConns()
 
 	go configureGossipProtocol()
 
@@ -126,7 +126,7 @@ func handle_service_comms(mp2ServiceAddr string) {
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
 	mp2Service.outbox <- "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	go handle_service_sending()
+	go handleServiceOutbox()
 	go handle_service_receiving()
 	for incomingMsg := range mp2Service.inbox {
 		// handle messages
@@ -137,18 +137,7 @@ func handle_service_comms(mp2ServiceAddr string) {
 		case string:
 			msgType := strings.Split(mp2ServiceMsg, " ")[0]
 			// TODO: replace this with a case statement
-			if msgType == "INTRODUCE" {
-				// Example: INTRODUCE node2 172.22.156.3 4567
-				print(mp2ServiceMsg, "\n")
-				node := new(nodeComm)
-				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
-				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
-				connectToNode(node) // TODO: do handle node comms inside this routine
-				neighborMapMutex.Lock()
-				neighborMap[node.nodeName] = node
-				neighborMapMutex.Unlock()
-				go node.handleNodeComm()
-			} else if msgType == "TRANSACTION" {
+			if msgType == "TRANSACTION" {
 				// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 				//fmt.Println("received mp2_service transaction")
 				var transactionID TransID
@@ -167,6 +156,17 @@ func handle_service_comms(mp2ServiceAddr string) {
 				copy(transactionID[:], transactionIDSlice[:TranSize])
 				*transaction = TransactionMessage{transactionTime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
 				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+			} else if msgType == "INTRODUCE" {
+				// Example: INTRODUCE node2 172.22.156.3 4567
+				print(mp2ServiceMsg, "\n")
+				node := new(nodeComm)
+				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
+				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
+				connectToNode(node) // TODO: do handle node comms inside this routine
+				neighborMapMutex.Lock()
+				neighborMap[node.nodeName] = node
+				neighborMapMutex.Unlock()
+				go node.handleNodeComm()
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
 				// TODO: impelment a better quit or die handler
 				Error.Println("QUIT or DIE received")
@@ -184,7 +184,7 @@ func handle_service_sending() {
 		switch m := incomingMsg.(type) {
 		case string:
 			_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
-			if err != nil {
+			if err != nil {                            // NOTE: unnecessary
 				// attempt 1 retry, then give up
 				_, err := mp2Service.conn.Write([]byte(m)) // sends m over TCP
 				check(err)
@@ -197,7 +197,7 @@ func handle_service_sending() {
 }
 
 func handle_service_receiving() {
-	buf := make([]byte, 65536) // Make a buffer to hold incoming data
+	buf := make([]byte, 65536) // Make a buffer to hold incoming data // tODO: I highly doubt you need this big a buffer, even for blocks
 	for {
 		msglen, err := mp2Service.conn.Read(buf)
 		check(err)
@@ -210,7 +210,7 @@ func handle_service_receiving() {
 	}
 }
 
-func listen_for_conns() {
+func handleIncomingConns() {
 	var conn net.Conn
 	listener, err := net.Listen("tcp", ":"+localPort) // open port
 	check(err)

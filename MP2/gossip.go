@@ -72,6 +72,7 @@ func (node *nodeComm) handleNodeComm() {
 
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
+	// TODO: make lastSentTransactionIndex part of the node struct so you can easily reset it
 	lastSentTransactionIndex := 0 // to send only new transactionIDs, need to keep track of last sent index
 
 	for val := range node.inbox {
@@ -80,6 +81,7 @@ func (node *nodeComm) handleNodeComm() {
 			neighborMapMutex.Lock()
 			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
 
+				// TODO: you never opened the conn
 				Error.Println("How Did we get here?")
 				newNode := new(nodeComm)
 				newNode.nodeName = m.NodeName
