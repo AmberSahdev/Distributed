@@ -34,15 +34,15 @@ func connectToNode(node *nodeComm) {
 	var err error
 	node.inbox = make(chan Message, 65536)
 	node.outbox = make(chan Message, 65536)
-	node.isConnected = false
+	node.isConnected = true
 	node.conn, err = net.Dial("tcp", node.address)
 	check(err) // TODO: maybe dont crash here IMPORTANT!!!
 	m := new(Message)
-	*m = Message(ConnectionMessage{
+	*m = ConnectionMessage{
 		NodeName: localNodeName,
 		IPaddr:   localIPaddr,
 		Port:     localPort,
-	})
+	}
 	node.outbox <- *m
 }
 
