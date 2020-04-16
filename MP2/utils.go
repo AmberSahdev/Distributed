@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/gob"
-	"encoding/json"
 	"net"
-	"reflect"
 	"strings"
 	"time"
 )
@@ -32,7 +30,7 @@ func min(x, y int) int {
 }
 
 // TODO: Make this a goroutine
-func connect_to_node(node *nodeComm) {
+func connectToNode(node *nodeComm) {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
 	node.inbox = make(chan Message, 65536)
@@ -52,69 +50,7 @@ func connect_to_node(node *nodeComm) {
 	check(err)
 }
 
-func (node *nodeComm) tcp_enc_struct(m Message) error {
-	// Send a struct over TCP node.Conn() using JSON encoding with the prefix of struct's name
-	prefix := []uint8(reflect.TypeOf(m).String() + ":")
-	mJSON, err := json.Marshal(m)
-	check(err)
-	mJSON = append(prefix, mJSON...) // appending a slice to a slice
-
-	neighborMapMutex.Lock()
-	if _, exists := neighborMap[node.nodeName]; !exists {
-		neighborMapMutex.Unlock()
-		return nil
-	}
-	neighborMapMutex.Unlock()
-
-	_, err = node.conn.Write([]byte(mJSON))
-	//fmt.Println("\t sent ", string(mJSON))
-	//check(err) // checked on callee-side
-	return err
-}
-
-func (node *nodeComm) tcp_dec_struct(overflowData string) ([]string, []string, string) {
-	/*
-		Receive data over TCP node.Conn() using JSON encoding as detailed in tcp_enc_struct()
-		Input:
-			overflowData: data that wasn't a part of a complete struct the last time this function was called
-		Output:
-			retStructType: a list of struct names, index corresponds to the corresponding struct data in retstructData
-			retstructData: list of data in Json format, corresponds to the struct at corresponding index of retStructType
-			overflowData: data that was not a part of a complete struct on this conn.Read(). Feed it back in on the next call
-	*/
-	buf := make([]byte, 1024)
-	l, err := node.conn.Read(buf)
-	//check(err)
-	if err != nil {
-		return nil, nil, "DISCONNECTED"
-	}
-
-	//fmt.Println("\nReceived the following on decoding side with overflowData: ", overflowData+string(buf[:l]))
-
-	// have to do this because TCP coalesces messages
-	ListOfMessages := strings.Split(overflowData+string(buf[:l]), "}")
-
-	numMessages := len(ListOfMessages) - 1
-	//fmt.Println("\n numMessages ", numMessages)
-
-	retStructType := make([]string, numMessages)
-	retstructData := make([]string, numMessages)
-
-	for i := 0; i < numMessages; i++ {
-		message := ListOfMessages[i]
-		mSlice := strings.SplitN(string(message), ":", 2)
-		retStructType[i] = mSlice[0]
-		retstructData[i] = mSlice[1] + "}"
-	}
-
-	overflowData = ListOfMessages[numMessages] // the last index (the trailing data that wasn't a part of a complete struct)
-
-	//fmt.Println("\n retStructType ", retStructType)
-	//fmt.Println("\n retstructData ", retstructData)
-	return retStructType, retstructData, overflowData
-}
-
-func add_transaction(m TransactionMessage) {
+func addTransaction(m TransactionMessage) {
 	newM := new(TransactionMessage)
 	*newM = m
 	transactionListMutex.Lock()
@@ -128,15 +64,18 @@ func add_transaction(m TransactionMessage) {
 
 // Find takes a slice and looks for an element in it. If found it will
 // return it's key, otherwise it will return -1 and a bool of false.
-func find_transaction(key string) (bool, *TransactionMessage) {
-	if val, exists := transactionMap[key]; exists {
+func findTransaction(key TransID) (bool, *TransactionMessage) {
+	transactionMapMutex.Lock()
+	val, exists := transactionMap[key]
+	transactionMapMutex.Unlock()
+	if exists {
 		return true, val
 	} else {
 		return false, nil
 	}
 }
 
-func nodeComm_to_ConnectionMessage(nodePtr *nodeComm) *ConnectionMessage {
+func nodecommToConnectionmessage(nodePtr *nodeComm) *ConnectionMessage {
 	ret := new(ConnectionMessage)
 	ret.NodeName = nodePtr.nodeName
 	ret.IPaddr = strings.Split(nodePtr.address, ":")[0]
@@ -144,7 +83,7 @@ func nodeComm_to_ConnectionMessage(nodePtr *nodeComm) *ConnectionMessage {
 	return ret
 }
 
-func debug_print_transactions() {
+func debugPrintTransactions() {
 	for {
 		time.Sleep(POLLINGPERIOD * time.Second)
 
@@ -153,24 +92,10 @@ func debug_print_transactions() {
 		for _, val := range transactionList {
 			Info.Println(*val)
 		}
-
-		/*
-			// doesn't let the program continue executing
-				buf := make([]byte, 1<<16)
-				runtime.Stack(buf, true)
-				fmt.Printf("%s", buf)
-
-				fmt.Println("end debug_print_transactions")
-		*/
-
-		// fmt.Print("neighborMap:")
-		// for k, _ := range neighborMap {
-		// 	fmt.Print(k, ",")
-		// }
 	}
 }
 
-func (node *nodeComm) check_node_status() bool {
+func (node *nodeComm) checkNodeStatus() bool {
 	neighborMapMutex.Lock()
 	defer neighborMapMutex.Unlock()
 	if _, exists := neighborMap[node.nodeName]; !exists {

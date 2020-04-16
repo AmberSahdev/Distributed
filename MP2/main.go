@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/hex"
 	"io"
 	"io/ioutil"
 	"log"
@@ -19,9 +20,9 @@ var (
 	Error   *log.Logger
 )
 
-const MAXNEIGHBORS = 50  // probably too high
-const POLLINGPERIOD = 10 // poll neighbors for their neighbors, transactions every POLLINGPERIOD*2 seconds
-
+const MAXNEIGHBORS = 12              // probably too high
+const POLLINGPERIOD = 10             // poll neighbors for their neighbors, transactions every POLLINGPERIOD*2 seconds
+const TranSize = 16                  // transactionID Size in bytes (128 bit IDs)
 var localNodeName string             // tracks local node's name
 var neighborMap map[string]*nodeComm // undirected graph // var neighborList []nodeComm // undirected graph
 var numConns uint8                   // tracks number of other nodes connected to this node for bookkeeping
@@ -31,7 +32,7 @@ var localPort string
 var mp2ServiceAddr string
 
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
-var transactionMap map[string]*TransactionMessage
+var transactionMap map[TransID]*TransactionMessage
 
 var neighborMapMutex sync.Mutex
 var transactionMapMutex sync.Mutex
@@ -53,7 +54,7 @@ func main() {
 
 	mp2ServiceAddr = parseServiceTextfile("serviceAddr.txt")[0]
 	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
-	transactionMap = make(map[string]*TransactionMessage)
+	transactionMap = make(map[TransID]*TransactionMessage)
 
 	neighborMap = make(map[string]*nodeComm)
 	neighborMap[localNodeName] = nil // To avoid future errors
@@ -64,7 +65,7 @@ func main() {
 
 	go listen_for_conns()
 
-	go debug_print_transactions() // TODO: remove later
+	go debugPrintTransactions() // TODO: remove later
 
 	handle_service_comms(mp2ServiceAddr)
 }
@@ -144,22 +145,30 @@ func handle_service_comms(mp2ServiceAddr string) {
 				node := new(nodeComm)
 				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
 				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
-				connect_to_node(node) // TODO: do handle node comms inside this routine
+				connectToNode(node) // TODO: do handle node comms inside this routine
 				neighborMapMutex.Lock()
 				neighborMap[node.nodeName] = node
 				neighborMapMutex.Unlock()
-				go node.handle_node_comm()
+				go node.handleNodeComm()
 			} else if msgType == "TRANSACTION" {
 				// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 				//fmt.Println("received mp2_service transaction")
-				transactiontime, _ := strconv.ParseFloat(strings.Split(mp2ServiceMsg, " ")[1], 64)
-				transactionID := strings.Split(mp2ServiceMsg, " ")[2]
-				transactionSrc, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[3])
-				transactionDest, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[4])
-				transactionAmt, _ := strconv.Atoi(strings.Split(mp2ServiceMsg, " ")[5])
+				var transactionID TransID
+				mp2ServiceMsgArr := strings.Split(mp2ServiceMsg, " ")
+				transactiontime, err := strconv.ParseFloat(mp2ServiceMsgArr[1], 64)
+				check(err)
+				transactionIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
+				check(err)
+				transactionSrc, err := strconv.Atoi(mp2ServiceMsgArr[3])
+				check(err)
+				transactionDest, err := strconv.Atoi(mp2ServiceMsgArr[4])
+				check(err)
+				transactionAmt, err := strconv.Atoi(mp2ServiceMsgArr[5])
+				check(err)
 				transaction := new(TransactionMessage)
-				*transaction = TransactionMessage{transactiontime, transactionID, uint32(transactionSrc), uint32(transactionDest), uint64(transactionAmt)}
-				add_transaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+				copy(transactionID[:], transactionIDSlice[:TranSize])
+				*transaction = TransactionMessage{transactiontime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
+				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
 				// TODO: impelment a better quit or die handler
 				Error.Println("QUIT or DIE received")
@@ -216,7 +225,7 @@ func listen_for_conns() {
 	for err == nil {
 		conn, err = listener.Accept()
 		node := setup_neighbor(conn)
-		go node.handle_node_comm() // open up a go routine
+		go node.handleNodeComm() // open up a go routine
 	}
 	_ = listener.Close()
 	Error.Println("Stopped listening because of error")

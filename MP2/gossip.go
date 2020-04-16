@@ -50,34 +50,24 @@ func (node *nodeComm) handle_outgoing_messages() {
 	}
 }
 
-func (node *nodeComm) poll_for_transaction() { // TODO: push to outbox
-	// when called, asks node.conn neighbor about the transaction IDs it has
-	TransactionIDs := make([]string, 0)
-	m := new(TransactionRequest)
-	*m = TransactionRequest{true, TransactionIDs}
-	if node.isConnected {
-		node.outbox <- m
-	} else {
-		Warning.Println("node", node.nodeName, "not connected, cancelling Poll for Transactions")
-	}
-}
-
-func (node *nodeComm) poll_for_neighbors() { // TODO: push to outbox
+func pollNeighbors() { // TODO: push to all outboxes
 	// when called, ask neighbors about their neghbors
 	m := new(DiscoveryMessage)
 	*m = DiscoveryMessage{true}
-	if node.isConnected {
-		node.outbox <- m
-	} else {
-		Warning.Println("node", node.nodeName, "not connected, cancelling Poll for Neighbors")
+	// TODO: Make this Mutex RW lock
+	neighborMapMutex.Lock()
+	for _, node := range neighborMap {
+		if node.isConnected {
+			node.outbox <- m
+		}
 	}
-
+	neighborMapMutex.Unlock()
 }
 
-func (node *nodeComm) handle_node_comm() {
-	Info.Println("Start handle_node_comm for ", node.nodeName)
+func (node *nodeComm) handleNodeComm() {
+	Info.Println("Start handleNodeComm for ", node.nodeName)
 	// handles all logic for communication between nodes
-	go node.receive_incoming_data() // put messages of this conn into node.inbox
+	go node.receiveIncomingData() // put messages of this conn into node.inbox
 	go node.handle_outgoing_messages()
 
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
@@ -97,15 +87,15 @@ func (node *nodeComm) handle_node_comm() {
 				newNode.isConnected = true
 				neighborMap[newNode.nodeName] = newNode
 				neighborMapMutex.Unlock()
-				connect_to_node(newNode)
-				go newNode.handle_node_comm() // TODO: do this inside connect to node
+				connectToNode(newNode)
+				go newNode.handleNodeComm() // TODO: do this inside connect to node
 			} else {
 				neighborMapMutex.Unlock()
 			}
 
 		case TransactionMessage:
 			Info.Println("exchanged transaction, from ", node.nodeName)
-			add_transaction(m)
+			addTransaction(m)
 
 		case DiscoveryMessage:
 			if m.Request {
@@ -118,7 +108,7 @@ func (node *nodeComm) handle_node_comm() {
 					} else if i == numNeighborsSend {
 						break
 					}
-					newMsg := *nodeComm_to_ConnectionMessage(v)
+					newMsg := *nodecommToConnectionmessage(v)
 					node.outbox <- newMsg
 					i++
 				}
@@ -131,7 +121,7 @@ func (node *nodeComm) handle_node_comm() {
 			if m.Request == true && len(m.TransactionIDs) == 0 {
 				// send all your TransactionIDs
 				l := max(0, len(transactionList)-lastSentTransactionIndex)
-				TransactionIDs := make([]string, l)
+				TransactionIDs := make([]TransID, l)
 
 				j := 0
 				for i := lastSentTransactionIndex; i < len(transactionList); i++ {
@@ -146,7 +136,7 @@ func (node *nodeComm) handle_node_comm() {
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
-					exists, transactionPtr := find_transaction(transactionID)
+					exists, transactionPtr := findTransaction(transactionID)
 					if exists {
 						node.outbox <- *transactionPtr
 					} else {
@@ -157,15 +147,14 @@ func (node *nodeComm) handle_node_comm() {
 				// you have received list of transactionIDs other node has
 				// check if you have the received TransactionIDs
 				if len(m.TransactionIDs) != 0 {
-					var newtransactionIDs []string
+					var newTransactionIDs []TransID
 					for _, transactionID := range m.TransactionIDs {
-						exists, _ := find_transaction(transactionID)
+						exists, _ := findTransaction(transactionID)
 						if !exists {
-							newtransactionIDs = append(newtransactionIDs, transactionID)
+							newTransactionIDs = append(newTransactionIDs, transactionID)
 						}
 					}
-
-					msg := TransactionRequest{true, newtransactionIDs}
+					msg := TransactionRequest{true, newTransactionIDs}
 					node.outbox <- msg
 				}
 			}
@@ -185,7 +174,7 @@ func (node *nodeComm) handle_node_comm() {
 	panic("ERROR: outside for loop in handle_node_comm")
 }
 
-func (node *nodeComm) receive_incoming_data() {
+func (node *nodeComm) receiveIncomingData() {
 	tcpDecode := gob.NewDecoder(node.conn)
 	var err error = nil
 	for err == nil {
@@ -209,9 +198,7 @@ func (node *nodeComm) configureGossipProtocol() {
 
 	rand := time.Duration(rand.Intn(3)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	//rand := time.Duration(0) // for stress test debugging purposes
-	for node.isConnected { // TODO: use isConnected node status here
-		node.poll_for_transaction()
-		node.poll_for_neighbors()
-		time.Sleep((POLLINGPERIOD + rand) * time.Second)
-	}
+	time.Sleep((POLLINGPERIOD + rand) * time.Second)
+	pollNeighbors()
+
 }

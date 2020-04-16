@@ -1,8 +1,15 @@
 package main
 
-import "net"
+import (
+	"crypto/sha256"
+	"net"
+)
 
 // ----- Structure to store metadata about nodes introduced to us by mp2_service -----
+type TransID [TranSize]byte
+
+type AccountID uint32
+
 type nodeComm struct {
 	nodeName    string
 	address     string // neighboring node's address:port string
@@ -23,9 +30,9 @@ type ConnectionMessage struct { // Ex: INTRODUCE node2 172.22.156.3 4567
 
 type TransactionMessage struct { // Ex: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 	Timestamp     float64
-	TransactionID string // 128-bit unique transaction ID
-	Src           uint32
-	Dest          uint32
+	TransactionID TransID // 128-bit unique transaction ID
+	Src           AccountID
+	Dest          AccountID
 	Amount        uint64
 }
 
@@ -43,5 +50,16 @@ type TransactionRequest struct {
 	// if request = false, TransactionIDs has a list of TransactionIDs it has (TODO: make it new TransactionIDs)
 	//
 	Request        bool
-	TransactionIDs []string
+	TransactionIDs []TransID
+}
+
+type Block struct {
+	// if request = true && len(TransactionIDs) == 0, send back all TransactionIDs (TODO: store index of last sent TransactionID)
+	// if request = true && len(TransactionIDs) != 0, TransactionIDs has a list of TransactionIDs you need to send TransactionMessages of
+	// if request = false, TransactionIDs has a list of TransactionIDs it has (TODO: make it new TransactionIDs)
+	//
+	blockID         [sha256.Size]byte
+	transactions    []TransactionMessage
+	parentBlockID   [sha256.Size]byte
+	accountBalances map[AccountID]uint64
 }
