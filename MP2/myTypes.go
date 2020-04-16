@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"net"
 )
 
@@ -30,7 +29,7 @@ type ConnectionMessage struct { // Ex: INTRODUCE node2 172.22.156.3 4567
 
 type TransactionMessage struct { // Ex: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 	Timestamp     float64
-	TransactionID TransID // 128-bit unique transaction ID
+	TransactionID []byte // [TransID] // 128-bit unique transaction ID
 	Src           AccountID
 	Dest          AccountID
 	Amount        uint64
@@ -55,8 +54,9 @@ type TransactionRequest struct {
 
 /********************************* Blockchain *********************************/
 type Block struct {
-	blockID         [sha256.Size]byte
-	transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
-	parentBlockID   [sha256.Size]byte
-	accountBalances map[AccountID]uint64
+	ParentBlockID   string               // [sha256.Size]byte    // Previous block's proof of work/blockID
+	BlockHeight     uint64               // This block's height in its branch
+	Transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
+	AccountBalances map[AccountID]uint64 // a state of ledger at this point
+	BlockID         string               // [sha256.Size]byte    // Proof of work
 }
