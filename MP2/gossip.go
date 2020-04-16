@@ -140,7 +140,9 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			} else {
 				panic("ERROR received DiscoveryMessage with request false")
 			}
-
+		case DiscoveryReplyMessage:
+			//TODO
+			panic("Got Discovery Reply TBD")
 		case TransactionRequest:
 			Info.Println("Processing Transaction Request:", m, "from", node.nodeName)
 
@@ -237,7 +239,7 @@ func configureGossipProtocol() {
 
 func correctNumNeighbors() {
 	nodeMutex.RLock()
-	numNodes := len(nodeList) - 1 // index 0 is US!
+	numNodes := len(nodeList)
 	nodeMutex.RUnlock()
 	desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes))))+2)
 	if desiredNumConnections < numConns {
