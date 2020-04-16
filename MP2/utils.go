@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"net"
 	"strings"
 	"time"
@@ -37,17 +36,14 @@ func connectToNode(node *nodeComm) {
 	node.outbox = make(chan Message, 65536)
 	node.isConnected = false
 	node.conn, err = net.Dial("tcp", node.address)
-	check(err) // TODO: maybe dont crash here
-	tcpEnc := gob.NewEncoder(node.conn)
+	check(err) // TODO: maybe dont crash here IMPORTANT!!!
 	m := new(Message)
 	*m = Message(ConnectionMessage{
 		NodeName: localNodeName,
 		IPaddr:   localIPaddr,
 		Port:     localPort,
 	})
-	// fmt.Println("connect_to_node \t ", m)
-	err = tcpEnc.Encode(m)
-	check(err)
+	node.outbox <- *m
 }
 
 func addTransaction(m TransactionMessage) {

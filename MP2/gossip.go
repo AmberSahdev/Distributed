@@ -4,17 +4,20 @@ import (
 	"encoding/gob"
 	"math/rand"
 	"net"
+	"reflect"
 	"time"
 )
 
 /**************************** Setup Functions ****************************/
-func setupNeighbor(conn net.Conn) *nodeComm {
+func setupNeighbor(conn net.Conn) (*nodeComm, *gob.Decoder) {
 	// Called when a new Node is trying to connect to this node
 	tcpDec := gob.NewDecoder(conn)
-	incoming := new(Message)
-	err := tcpDec.Decode(incoming)
+	var incoming Message
+	err := tcpDec.Decode(&incoming)
 	check(err)
-	switch m := (*incoming).(type) {
+	myMsg := new(Message)
+	*myMsg = incoming
+	switch m := (*myMsg).(type) {
 	case ConnectionMessage:
 		node := new(nodeComm)
 		node.isConnected = true
@@ -27,11 +30,11 @@ func setupNeighbor(conn net.Conn) *nodeComm {
 		neighborMapMutex.Lock()
 		neighborMap[m.NodeName] = node
 		neighborMapMutex.Unlock()
-		return node
+		return node, tcpDec
 	default:
 		Error.Println("Got unexpected type as first messge:", incoming)
 	}
-	return nil
+	return nil, nil
 }
 
 /**************************** Go Routines ****************************/
@@ -40,7 +43,9 @@ func (node *nodeComm) handleOutgoingMessages() {
 	tcpEnc := gob.NewEncoder(node.conn)
 	var m Message
 	for m = range node.outbox {
-		err := tcpEnc.Encode(m)
+		sendMsg := new(Message)
+		*sendMsg = m
+		err := tcpEnc.Encode(sendMsg)
 		if err != nil {
 			Error.Println("Failed to send Message, receiver down?")
 			_ = node.conn.Close()
@@ -63,11 +68,11 @@ func pollNeighbors() { // TODO: push to all outboxes
 	neighborMapMutex.Unlock()
 }
 
-func (node *nodeComm) handleNodeComm() {
+func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 	Info.Println("Start handleNodeComm for ", node.nodeName)
 
 	// handles all logic for communication between nodes
-	go node.receiveIncomingData() // put messages of this conn into node.inbox
+	go node.receiveIncomingData(tcpDec) // put messages of this conn into node.inbox
 	go node.handleOutgoingMessages()
 
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
@@ -91,7 +96,7 @@ func (node *nodeComm) handleNodeComm() {
 				newNode.isConnected = true
 				neighborMap[newNode.nodeName] = newNode
 				neighborMapMutex.Unlock()
-				go newNode.handleNodeComm()
+				go newNode.handleNodeComm(nil)
 			} else {
 				// 2-way communication now established
 				incomingNode.isConnected = true
@@ -176,19 +181,21 @@ func (node *nodeComm) handleNodeComm() {
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
-			Warning.Println("Unknown Type in handle_node_comm ", m)
+			Warning.Println("Unknown Type in handle_node_comm ", m, "type:", reflect.TypeOf(m))
 		}
 	}
 	panic("ERROR: outside for loop in handle_node_comm")
 }
 
-func (node *nodeComm) receiveIncomingData() {
-	tcpDecode := gob.NewDecoder(node.conn)
+func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
+	if tcpDec == nil {
+		tcpDec = gob.NewDecoder(node.conn)
+	}
 	var err error = nil
 	for err == nil {
 		newM := new(Message)
-		err = tcpDecode.Decode(newM)
-		node.inbox <- *newM
+		err = tcpDec.Decode(newM)
+		node.inbox <- newM
 	}
 	node.inbox <- "DISCONNECTED"
 	close(node.inbox)
