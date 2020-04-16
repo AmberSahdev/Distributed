@@ -11,11 +11,11 @@ import (
 func setupNeighbor(conn net.Conn) *nodeComm {
 	// Called when a new Node is trying to connect to this node
 	tcpDec := gob.NewDecoder(conn)
-	var incoming Message
-	err := tcpDec.Decode(&incoming)
+	incoming := new(Message)
+	err := tcpDec.Decode(incoming)
 	check(err)
-	switch m := incoming.(type) {
-	case *ConnectionMessage:
+	switch m := (*incoming).(type) {
+	case ConnectionMessage:
 		node := new(nodeComm)
 		node.isConnected = true
 		node.nodeName = m.NodeName
@@ -57,7 +57,7 @@ func pollNeighbors() { // TODO: push to all outboxes
 	neighborMapMutex.Lock()
 	for nodeName, node := range neighborMap {
 		if nodeName != localNodeName && node.isConnected {
-			node.outbox <- m
+			node.outbox <- *m
 		}
 	}
 	neighborMapMutex.Unlock()
@@ -113,8 +113,9 @@ func (node *nodeComm) handleNodeComm() {
 					} else if i == numNeighborsSend {
 						break
 					}
-					newMsg := *nodecommToConnectionmessage(v)
-					node.outbox <- newMsg
+					newMsg := new(Message)
+					*newMsg = Message(*nodecommToConnectionmessage(v))
+					node.outbox <- *newMsg
 					i++
 				}
 			} else {
@@ -133,17 +134,18 @@ func (node *nodeComm) handleNodeComm() {
 					TransactionIDs[j] = transactionList[i].TransactionID
 					j++
 				}
-
-				msg := TransactionRequest{false, TransactionIDs}
-
-				node.outbox <- msg
+				msg := new(Message)
+				*msg = Message(TransactionRequest{false, TransactionIDs})
+				node.outbox <- *msg
 
 			} else if m.Request == true && len(m.TransactionIDs) != 0 {
 				// send requested TransactionIDs's corresponding TransactionMessage
 				for _, transactionID := range m.TransactionIDs {
 					exists, transactionPtr := findTransaction(transactionID)
 					if exists {
-						node.outbox <- *transactionPtr
+						m := new(Message)
+						*m = *transactionPtr
+						node.outbox <- *m
 					} else {
 						panic("ERROR You should not receive request for a transactionID that you do not have")
 					}
@@ -159,8 +161,9 @@ func (node *nodeComm) handleNodeComm() {
 							newTransactionIDs = append(newTransactionIDs, transactionID)
 						}
 					}
-					msg := TransactionRequest{true, newTransactionIDs}
-					node.outbox <- msg
+					msg := new(Message)
+					*msg = Message(TransactionRequest{true, newTransactionIDs})
+					node.outbox <- *msg
 				}
 			}
 		default:

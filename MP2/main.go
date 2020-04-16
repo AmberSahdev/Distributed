@@ -39,8 +39,8 @@ var transactionMapMutex sync.Mutex
 var transactionListMutex sync.Mutex
 
 func main() {
-	Init_Logging(os.Stdout, os.Stdout, os.Stderr)
-	Init_Gob()
+	initLogging(os.Stdout, os.Stdout, os.Stderr)
+	initGob()
 	arguments := os.Args
 	if len(arguments) != 3 {
 		Error.Println("Expected Format: ./gossip [Local Node Name] [port]")
@@ -69,12 +69,12 @@ func main() {
 
 	go debugPrintTransactions() // TODO: remove later
 
-	handle_service_comms(mp2ServiceAddr)
+	handleServiceComms(mp2ServiceAddr)
 }
 
 /**************************** Setup Functions ****************************/
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
-func Init_Logging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
+func initLogging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
 	Info = log.New(infoHandle,
 		"INFO: ",
 		log.Ltime|log.Lshortfile)
@@ -88,11 +88,11 @@ func Init_Logging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.
 		log.Ltime|log.Lshortfile)
 }
 
-func Init_Gob() {
-	gob.Register(&ConnectionMessage{})
-	gob.Register(&TransactionMessage{})
-	gob.Register(&DiscoveryMessage{})
-	gob.Register(&TransactionRequest{})
+func initGob() {
+	gob.Register(ConnectionMessage{})
+	gob.Register(TransactionMessage{})
+	gob.Register(DiscoveryMessage{})
+	gob.Register(TransactionRequest{})
 }
 
 // Get preferred outbound ip of this machine
@@ -116,7 +116,7 @@ func parseServiceTextfile(path string) []string {
 }
 
 /**************************** Go Routines ****************************/
-func handle_service_comms(mp2ServiceAddr string) {
+func handleServiceComms(mp2ServiceAddr string) {
 	var err error = nil
 	mp2Service.nodeName = "mp2Service"
 	mp2Service.address = mp2ServiceAddr
@@ -126,8 +126,8 @@ func handle_service_comms(mp2ServiceAddr string) {
 	mp2Service.conn, err = net.Dial("tcp", mp2Service.address)
 	check(err)
 	mp2Service.outbox <- "CONNECT " + localNodeName + " " + localIPaddr + " " + localPort + "\n" // Send a message like "CONNECT node1 172.22.156.2 4444"
-	go handleServiceOutbox()
-	go handle_service_receiving()
+	go handleServiceSending()
+	go handleServiceReceiving()
 	for incomingMsg := range mp2Service.inbox {
 		// handle messages
 		//    1.1 Upto 3 INTRODUCE
@@ -179,7 +179,7 @@ func handle_service_comms(mp2ServiceAddr string) {
 	}
 }
 
-func handle_service_sending() {
+func handleServiceSending() {
 	for incomingMsg := range mp2Service.outbox {
 		switch m := incomingMsg.(type) {
 		case string:
@@ -196,8 +196,8 @@ func handle_service_sending() {
 	}
 }
 
-func handle_service_receiving() {
-	buf := make([]byte, 65536) // Make a buffer to hold incoming data // tODO: I highly doubt you need this big a buffer, even for blocks
+func handleServiceReceiving() {
+	buf := make([]byte, 65536) // Make a buffer to hold incoming data
 	for {
 		msglen, err := mp2Service.conn.Read(buf)
 		check(err)
