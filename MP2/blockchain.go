@@ -93,8 +93,3 @@ func deleteDuplicateTransactions(b *Block) {
 func resetCurrentIndexPointers() {
 	// TODO: go through all nodes and reset their CurrentIndexPointers to 0
 }
-
-// // TODO:
-// verify with mp2 service
-// if no parent then drop it
-// delete from transactionList
