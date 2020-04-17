@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
