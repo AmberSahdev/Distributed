@@ -43,7 +43,7 @@ type DiscoveryMessage struct {
 	// if request = true, send back NeighborAddresses.
 	// if request = false, you just received NeighborAddresses.
 	Request bool
-	//NeighborAddresses []ConnectionMessage // list of node's address:port string
+	// NeighborAddresses []ConnectionMessage // list of node's address:port string
 }
 
 type DiscoveryReplyMessage struct {
@@ -51,6 +51,7 @@ type DiscoveryReplyMessage struct {
 	BlocksPendingTransmission       []BlockID
 	TransactionsPendingTransmission []TransID
 }
+
 type GossipRequestMessage struct {
 	NodesNeeded        []string
 	BlocksNeeded       []BlockID
@@ -65,8 +66,9 @@ type BatchGossipMessage struct {
 
 /********************************* Blockchain *********************************/
 type Block struct {
-	BlockID         BlockID
+	ParentBlockID   string               // [sha256.Size]byte    // Previous block's proof of work/blockID
+	BlockHeight     uint64               // This block's height in its branch
 	Transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
-	ParentBlockID   BlockID
-	AccountBalances map[AccountID]uint64
+	AccountBalances map[AccountID]uint64 // a state of ledger at this point
+	BlockID         BlockID              // [sha256.Size]byte    // Proof of work
 }
