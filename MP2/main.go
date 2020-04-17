@@ -54,7 +54,7 @@ func main() {
 	initGob()
 	arguments := os.Args
 	if len(arguments) != 3 {
-		Error.Println("Expected Format: ./gossip [Local Node Name] [port]")
+		Error.Println("Expected Format: ./main [Local Node Name] [port]")
 		return
 	}
 	localNodeName = arguments[1]
@@ -98,8 +98,9 @@ func main() {
 func initLogging(debugHandle io.Writer, infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
 
 	Debug = log.New(debugHandle,
-		"DEBUG: ",
-		log.Ltime|log.Lshortfile)
+		"DEBUG: ", 0)
+
+	//log.Ltime|log.Lshortfile)
 
 	Info = log.New(infoHandle,
 		"INFO: ",

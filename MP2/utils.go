@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"net"
 	"strings"
@@ -106,9 +107,12 @@ func debugPrintTransactions() {
 	for {
 		time.Sleep(POLLINGPERIOD * 5 * time.Millisecond)
 		// print Transactions for debugging and verification purposes
+
 		Debug.Println("\nCurrent Transactions:")
 		for _, val := range transactionList {
-			Debug.Println(*val)
+			t := val.TransactionID
+			transID := fmt.Sprintf("%x", t)
+			Debug.Println(transID)
 		}
 	}
 }
