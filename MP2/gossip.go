@@ -58,21 +58,6 @@ func (node *nodeComm) handleOutgoingMessages() {
 	}
 }
 
-// TODO: Remove this as it is unnecessary
-func pollNeighbors() {
-	// when called, ask neighbors about their neghbors
-	m := new(DiscoveryMessage)
-	*m = DiscoveryMessage{true}
-	// TODO: Make this Mutex RW lock
-	neighborMutex.RLock()
-	for nodeName, node := range neighborMap {
-		if nodeName != localNodeName && node.isConnected {
-			node.outbox <- *m
-		}
-	}
-	neighborMutex.RUnlock()
-}
-
 func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 	Info.Println("Start handleNodeComm for ", node.nodeName)
 
@@ -83,9 +68,8 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
 
 	// TODO: make lastSentTransactionIndex part of the node struct so you can easily reset it
-	lastSentTransactionIndex := -1 // to send only new transactionIDs, need to keep track of last sent index
-	lastSentBlockIndex := -1       // to send only new blocks, need to keep track of last sent index
-	lastSentNodeIndex := -1        // to send only new nodes, need to keep track of last sent index
+	lastSentBlockIndex := -1 // to send only new blocks, need to keep track of last sent index
+	lastSentNodeIndex := -1  // to send only new nodes, need to keep track of last sent index
 
 	for val := range node.inbox {
 		switch m := val.(type) {
@@ -114,17 +98,17 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 		case BatchGossipMessage:
 			Info.Println("Received transaction", m, "from", node.nodeName)
 			transactionMutex.Lock()
+			processedTransactionMutex.RLock()
 			for _, curTransaction := range m.BatchTransactions {
-				addTransaction(*curTransaction)
+				if _, alreadyProcessed := processedTransactionSet[curTransaction.TransactionID]; !alreadyProcessed {
+					addTransaction(*curTransaction)
+				}
 			}
+			processedTransactionMutex.RUnlock()
 			transactionMutex.Unlock()
-
-			blockMutex.Lock()
 			for _, curBlock := range m.BatchBlocks {
-				addBlock(*curBlock)
+				addBlock(*curBlock, false)
 			}
-			blockMutex.Unlock()
-
 			nodeMutex.Lock()
 			for _, curNode := range m.BatchNodes {
 				addNode(*curNode)
@@ -158,8 +142,8 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			blockBatch := make([]*Block, 0)
 			blockMutex.RLock()
 			for _, blockID := range m.BlocksNeeded {
-				if ind, exists := blockMap[blockID]; exists {
-					blockBatch = append(blockBatch, blockList[ind])
+				if curBlockInfo, exists := blockMap[blockID]; exists {
+					blockBatch = append(blockBatch, blockList[curBlockInfo.Index])
 				} else {
 					Warning.Println("This node claimed to have node:", blockID, "but doesn't anymore!")
 				}
@@ -173,23 +157,25 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 		case DiscoveryMessage:
 			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
 			if m.Request {
-				nodeMutex.RLock()
 				nodesPendingTransmission := make([]string, 0)
+				nodeMutex.RLock()
 				for ; lastSentNodeIndex < len(nodeList)-1; lastSentNodeIndex++ {
 					nodesPendingTransmission = append(nodesPendingTransmission, nodeList[lastSentNodeIndex+1].NodeName)
 				}
 				nodeMutex.RUnlock()
-				blockMutex.RLock()
 				blocksPendingTransmission := make([]BlockID, 0)
+				blockMutex.RLock()
 				for ; lastSentBlockIndex < len(blockList)-1; lastSentBlockIndex++ {
 					blocksPendingTransmission = append(blocksPendingTransmission, blockList[lastSentBlockIndex+1].BlockID)
 				}
 				blockMutex.RUnlock()
-				transactionMutex.RLock()
 				transactionsPendingTransmission := make([]TransID, 0)
-				for ; lastSentTransactionIndex < len(transactionList)-1; lastSentTransactionIndex++ {
-					transactionsPendingTransmission = append(transactionsPendingTransmission, transactionList[lastSentTransactionIndex+1].TransactionID)
+				transactionMutex.RLock()
+				neighborMutex.Lock()
+				for ; node.lastSentTransactionIndex < len(transactionList)-1; node.lastSentTransactionIndex++ {
+					transactionsPendingTransmission = append(transactionsPendingTransmission, transactionList[node.lastSentTransactionIndex+1].TransactionID)
 				}
+				neighborMutex.Unlock()
 				transactionMutex.RUnlock()
 				response := new(DiscoveryReplyMessage)
 				*response = DiscoveryReplyMessage{nodesPendingTransmission, blocksPendingTransmission, transactionsPendingTransmission}
@@ -211,11 +197,15 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 
 			transactionsNeeded := make([]TransID, 0)
 			transactionMutex.RLock()
+			processedTransactionMutex.RLock()
 			for _, transactionID := range m.TransactionsPendingTransmission {
-				if _, exists := transactionMap[transactionID]; !exists {
-					transactionsNeeded = append(transactionsNeeded, transactionID)
+				if _, alreadyProcessed := processedTransactionSet[transactionID]; !alreadyProcessed {
+					if _, exists := transactionMap[transactionID]; !exists {
+						transactionsNeeded = append(transactionsNeeded, transactionID)
+					}
 				}
 			}
+			processedTransactionMutex.RUnlock()
 			transactionMutex.RUnlock()
 
 			blocksNeeded := make([]BlockID, 0)
@@ -284,7 +274,7 @@ func correctNumNeighbors() {
 	for {
 		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
 		nodeMutex.RLock()
-		numNodes := len(nodeList) - 1
+		numNodes := len(nodeList) - 1 // TODO: Refactor to numOtherNodes
 		nodeMutex.RUnlock()
 		desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes+1))))+3)
 		for i := 0; desiredNumConnections > numConns && i < min(numNodes, 10); i++ {

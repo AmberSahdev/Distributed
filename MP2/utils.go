@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"net"
 	"time"
 )
@@ -59,15 +58,29 @@ func addTransaction(m TransactionMessage) {
 	}
 }
 
-func addBlock(m Block) {
+func addBlock(m Block, isLocal bool) {
 	newM := new(Block)
 	*newM = m
 	// TODO: put block in a separate map for pending verification before commiting to block list and propagating
+	blockMutex.Lock()
 	if _, exists := blockMap[m.BlockID]; !exists {
-		blockMap[m.BlockID] = len(blockList)
+		myBlock := new(BlockInfo)
+		*myBlock = BlockInfo{
+			Index:           len(blockList),
+			Verified:        false,
+			ChildDependents: make([]BlockID, 0),
+		}
+		blockMap[m.BlockID] = myBlock
 		blockList = append(blockList, newM)
+		blockMutex.Unlock()
+		if isLocal {
+			localVerifiedBlocks <- newM
+		} else {
+			go verifyBlock(newM)
+		}
 	} else {
 		Warning.Println("Got Block", m.BlockID, "but already added to local set")
+		blockMutex.Unlock()
 	}
 }
 
@@ -80,19 +93,6 @@ func addNode(m ConnectionMessage) {
 		nodeList = append(nodeList, newM)
 	} else {
 		Warning.Println("Got Node", m.NodeName, "but already added to local set")
-	}
-}
-
-// Find takes a slice and looks for an element in it. If found it will
-// return it's key, otherwise it will return -1 and a bool of false.
-func findTransaction(key TransID) (bool, *TransactionMessage) {
-	transactionMutex.RLock()
-	defer transactionMutex.RUnlock()
-	ind, exists := transactionMap[key]
-	if exists && ind != math.MaxInt64 {
-		return true, transactionList[ind]
-	} else {
-		return false, nil
 	}
 }
 
