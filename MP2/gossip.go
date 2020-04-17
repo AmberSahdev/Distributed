@@ -66,7 +66,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 
 	lastSentBlockIndex := -1 // to send only new blocks, need to keep track of last sent index
 	lastSentNodeIndex := -1  // to send only new nodes, need to keep track of last sent index
-
+	node.lastSentTransactionIndex = -1
 	for val := range node.inbox {
 		switch m := val.(type) {
 		case ConnectionMessage:
