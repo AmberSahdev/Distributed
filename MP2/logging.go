@@ -49,8 +49,6 @@ func logBandwidth(m *Message, numBytes int) {
 			Error.Println("logBandwidth error in encoding to byte buffer")
 		}
 		numBytes = len(network.Bytes())
-	} else {
-		Error.Println("Using logBandwidth incorrectly")
 	}
 	fBandwidth.WriteString(strconv.Itoa(numBytes) + " ")
 }
