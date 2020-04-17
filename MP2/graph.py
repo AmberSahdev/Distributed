@@ -44,6 +44,7 @@ def bandwidth_graph():
     plt.savefig(fname=baseDir + 'bandwidth_linear_case' + str(case) + '.png', dpi=200)
     plt.close()
 
+    """
     # Logarithmic scale on the y-axis
     plt.plot(np.arange(len(avgBandwidth)), avgBandwidth, 'bx:', label='bandwidth')
     # plt.scatter((np.arange(seconds/window)*window).tolist(), avgBandwidth, marker='x', c='b', label='bandwidth')
@@ -54,6 +55,7 @@ def bandwidth_graph():
     plt.grid()
     plt.savefig(fname=baseDir + 'bandwidth_logscale_case' + str(case) + '.png', dpi=200)
     plt.close()
+    """
     return
 
 def reachability_graph():

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"io/ioutil"
@@ -20,10 +21,15 @@ var (
 	Error   *log.Logger
 )
 
-const POLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
-const TranSize = 16        // transactionID Size in bytes (128 bit IDs)
-var localNodeName string   // tracks local node's name
+const MaxTransactionsInBlock = 2000
+const GOSSIPPOLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
+const CONNPOLLINGPERIOD = 1000   // polling period for connecting to new nodes.
+
+const TranSize = 16      // transactionID Size in bytes (128 bit IDs)
+var localNodeName string // tracks local node's name
 var numConns int
+var rootBlockID BlockID
+var empty struct{} // to avoid ugly struct{}{}
 
 var localIPaddr string
 var localPort string
@@ -32,6 +38,11 @@ var mp2Service nodeComm
 
 var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
 var transactionMap map[TransID]int
+var processedTransactionSet map[TransID]struct{}
+var processedTransactionMutex sync.RWMutex
+var currentBlockBeingMined *Block
+var currentBlockBeingMinedMutex sync.Mutex
+var curLongestChainLeafMutex sync.Mutex
 
 var curNeighborToPoll int
 var neighborMap map[string]*nodeComm
@@ -40,13 +51,15 @@ var neighborList []*nodeComm
 var nodeMap map[string]int
 var nodeList []*ConnectionMessage
 
-var blockMap map[BlockID]int
+var blockMap map[BlockID]*BlockInfo
 var blockList []*Block
 
 var nodeMutex sync.RWMutex
 var neighborMutex sync.RWMutex
 var transactionMutex sync.RWMutex
 var blockMutex sync.RWMutex
+var serviceVerifiedBlockIDs chan BlockID
+var localVerifiedBlocks chan *Block
 
 func main() {
 	initLogging()
@@ -65,12 +78,13 @@ func main() {
 	mp2ServiceAddr := parseServiceTextfile("serviceAddr.txt")[0]
 	Info.Println("Found MP2 Service Address to be:", mp2ServiceAddr)
 	transactionMap = make(map[TransID]int)
-	blockMap = make(map[BlockID]int)
+
+	serviceVerifiedBlockIDs = make(chan BlockID, 65536)
+	localVerifiedBlocks = make(chan *Block, 65536)
 	nodeMap = make(map[string]int)
 	neighborMap = make(map[string]*nodeComm)
 
 	nodeMap[localNodeName] = 0 // to avoid future errors
-	nodeList = make([]*ConnectionMessage, 0)
 	myConn := new(ConnectionMessage)
 	*myConn = ConnectionMessage{
 		NodeName: localNodeName,
@@ -82,13 +96,41 @@ func main() {
 	transactionMutex = sync.RWMutex{}
 	blockMutex = sync.RWMutex{}
 	neighborMutex = sync.RWMutex{}
+	curLongestChainLeafMutex = sync.Mutex{}
+	processedTransactionMutex = sync.RWMutex{}
 
+	blockMap = make(map[BlockID]*BlockInfo)
+	rootBlockID = [sha256.Size]byte{}
+	rootBlockInfo := new(BlockInfo)
+	*rootBlockInfo = BlockInfo{
+		Index:           0,
+		Verified:        true,
+		ChildDependents: nil,
+	}
+	blockMap[rootBlockID] = rootBlockInfo
+	// relying on zero value of byte array
+	rootAccountBalances := make(map[AccountID]uint64)
+	startBlock := new(Block)
+	*startBlock = Block{
+		ParentBlockID:   rootBlockID,
+		Transactions:    nil,
+		AccountBalances: rootAccountBalances,
+		BlockHeight:     0,
+		BlockID:         rootBlockID,
+		BlockProof:      [sha256.Size]byte{},
+	}
+	blockList = append(blockList, startBlock)
+	currentBlockBeingMinedMutex = sync.Mutex{}
+	currentBlockBeingMined = nil
+	localVerifiedBlocks <- startBlock
 	go handleIncomingConns()
 
 	go configureGossipProtocol()
 
 	go debugPrintTransactions() // TODO: remove later
 	go logging()
+
+	go blockchain()
 
 	handleServiceComms(mp2ServiceAddr)
 }
@@ -126,14 +168,10 @@ func initGob() {
 // Get preferred outbound ip of this machine
 func GetOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		Error.Println("Failed to get local IP")
-		panic(err)
-	}
-	defer conn.Close()
-
+	check(err)
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
+	err = conn.Close()
+	check(err)
 	return localAddr.IP.String()
 }
 
@@ -186,6 +224,33 @@ func handleServiceComms(mp2ServiceAddr string) {
 				transactionMutex.Lock()
 				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 				transactionMutex.Unlock()
+			} else if msgType == "VERIFY" {
+				if mp2ServiceMsgArr[1] == "OK" {
+					// Block mining verified, push to blockchain thread
+					result := new(BlockID)
+					blockIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
+					check(err)
+					copy(result[:], blockIDSlice[:sha256.Size])
+					serviceVerifiedBlockIDs <- *result
+				} else {
+					Warning.Println("Got Rejection of verification for:", mp2ServiceMsgArr[2], mp2ServiceMsgArr[3])
+				}
+			} else if msgType == "SOLVED" {
+				var solvedBlockID BlockID
+				var solvedProof BlockPW
+				tmp, err := hex.DecodeString(mp2ServiceMsgArr[1])
+				check(err)
+				copy(solvedBlockID[:], tmp[:sha256.Size])
+				tmp, err = hex.DecodeString(mp2ServiceMsgArr[2])
+				check(err)
+				copy(solvedProof[:], tmp[:sha256.Size])
+				currentBlockBeingMinedMutex.Lock()
+				if currentBlockBeingMined.BlockID == solvedBlockID {
+					Info.Println("Locally Mined Block with ID:", solvedBlockID)
+					currentBlockBeingMined.BlockProof = solvedProof
+					addBlock(*currentBlockBeingMined, true)
+				}
+				currentBlockBeingMinedMutex.Unlock()
 			} else if msgType == "INTRODUCE" {
 				// Example: INTRODUCE node2 172.22.156.3 4567
 				Info.Println(mp2ServiceMsg)
