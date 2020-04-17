@@ -127,7 +127,7 @@ func main() {
 
 	go configureGossipProtocol()
 
-	go debugPrintTransactions() // TODO: remove later
+	// go debugPrintTransactions() // TODO: remove later
 	go logging()
 
 	go blockchain()
