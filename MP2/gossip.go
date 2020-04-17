@@ -48,7 +48,7 @@ func (node *nodeComm) handleOutgoingMessages() {
 		sendMsg := new(Message)
 		*sendMsg = m
 		err := tcpEnc.Encode(sendMsg)
-		Info.Println("Sending", *sendMsg, "to", node.nodeName)
+		// Info.Println("Sending", *sendMsg, "to", node.nodeName)
 		if err != nil {
 			Error.Println("Failed to send Message, error:", err)
 			_ = node.conn.Close()
@@ -71,7 +71,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 		switch m := val.(type) {
 		case ConnectionMessage:
 			neighborMutex.Lock()
-			Info.Println("Processing Connection Message:", m, "from", node.nodeName)
+			// Info.Println("Processing Connection Message:", m, "from", node.nodeName)
 			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
 				Error.Println("How Did we get here?")
 				newNode := new(nodeComm)
@@ -90,7 +90,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			}
 
 		case BatchGossipMessage:
-			Info.Println("Received transaction", m, "from", node.nodeName)
+			// Info.Println("Received transaction", m, "from", node.nodeName)
 			transactionMutex.Lock()
 			processedTransactionMutex.RLock()
 			for _, curTransaction := range m.BatchTransactions {
@@ -149,7 +149,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			node.outbox <- *response
 
 		case DiscoveryMessage:
-			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
+			// Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
 			if m.Request {
 				nodesPendingTransmission := make([]string, 0)
 				nodeMutex.RLock()
@@ -222,7 +222,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				neighborMutex.Lock()
 				removeNeighbor(node)
 				neighborMutex.Unlock()
-				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
+				Warning.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
 			Warning.Println("Unknown Type in handleNodeComm", m, "type:", reflect.TypeOf(m))
@@ -239,7 +239,7 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 	for err == nil {
 		newM := new(Message)
 		err = tcpDec.Decode(newM)
-		Info.Println("Received", *newM, "from", node.nodeName)
+		// Info.Println("Received", *newM, "from", node.nodeName)
 		node.inbox <- *newM
 
 		logBandwidth(newM, 0) // TODO: come back to this later
@@ -272,7 +272,7 @@ func correctNumNeighbors() {
 		nodeMutex.RLock()
 		numOtherNodes := len(nodeList) - 1
 		nodeMutex.RUnlock()
-		desiredNumConnections := min(numOtherNodes, int(math.Ceil(math.Log2(float64(numOtherNodes+1))))+3)
+		desiredNumConnections := min((numOtherNodes+1)/2-1, int(math.Ceil(math.Log2(float64(numOtherNodes+1))))+3)
 		for i := 0; desiredNumConnections > numConns && i < min(numOtherNodes, 10); i++ {
 			if i == 0 {
 				Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
@@ -283,19 +283,15 @@ func correctNumNeighbors() {
 			node.nodeName = nodeList[candidateNeighbor].NodeName
 			node.address = nodeList[candidateNeighbor].IPaddr + ":" + nodeList[candidateNeighbor].Port
 			nodeMutex.RUnlock()
-			neighborMutex.RLock()
+			neighborMutex.Lock()
 			if _, exists := neighborMap[node.nodeName]; !exists {
-				neighborMutex.RUnlock()
 				err := connectToNode(node)
 				if err == nil {
-					neighborMutex.Lock()
 					addNeighbor(node)
-					neighborMutex.Unlock()
 					go node.handleNodeComm(nil)
 				}
-			} else {
-				neighborMutex.RUnlock()
 			}
+			neighborMutex.Unlock()
 		}
 	}
 }

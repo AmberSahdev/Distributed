@@ -12,6 +12,7 @@ var curLongestChainLeaf *Block
 func blockchain() {
 	go handleBlockchainServerVerifies()
 	curLongestChainLeaf = <-localVerifiedBlocks
+	go startNewMine(curLongestChainLeaf)
 	for newValidBlock := range localVerifiedBlocks {
 		if newValidBlock.ParentBlockID == curLongestChainLeaf.BlockID {
 			// Add this block to longest chain, update pending transactions
@@ -156,7 +157,9 @@ func tryMineBlock(curBlock *Block) {
 	currentBlockBeingMinedMutex.Lock()
 	currentBlockBeingMined = curBlock
 	currentBlockBeingMinedMutex.Unlock()
-	serviceMsg := "SOLVE " + hex.EncodeToString(curBlock.BlockID[:]) + "\n"
+	blockIDstr := hex.EncodeToString(curBlock.BlockID[:])
+	Info.Println("Trying to mine Block with ID:", blockIDstr)
+	serviceMsg := "SOLVE " + blockIDstr + "\n"
 	mp2Service.outbox <- serviceMsg
 }
 
