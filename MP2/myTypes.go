@@ -51,20 +51,22 @@ type DiscoveryReplyMessage struct {
 	BlocksPendingTransmission       []BlockID
 	TransactionsPendingTransmission []TransID
 }
+type GossipRequestMessage struct {
+	NodesNeeded        []string
+	BlocksNeeded       []BlockID
+	TransactionsNeeded []TransID
+}
 
-type TransactionRequest struct {
-	// if request = true && len(TransactionIDs) == 0, send back all TransactionIDs (TODO: store index of last sent TransactionID)
-	// if request = true && len(TransactionIDs) != 0, TransactionIDs has a list of TransactionIDs you need to send TransactionMessages of
-	// if request = false, TransactionIDs has a list of TransactionIDs it has (TODO: make it new TransactionIDs)
-	//
-	Request        bool
-	TransactionIDs []TransID
+type BatchGossipMessage struct {
+	BatchTransactions []*TransactionMessage
+	BatchNodes        []*ConnectionMessage
+	BatchBlocks       []*Block
 }
 
 /********************************* Blockchain *********************************/
 type Block struct {
-	blockID         BlockID
-	transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
-	parentBlockID   BlockID
-	accountBalances map[AccountID]uint64
+	BlockID         BlockID
+	Transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
+	ParentBlockID   BlockID
+	AccountBalances map[AccountID]uint64
 }

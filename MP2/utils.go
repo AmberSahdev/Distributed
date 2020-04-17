@@ -44,18 +44,41 @@ func connectToNode(node *nodeComm) {
 		Port:     localPort,
 	}
 	node.outbox <- *m
-	nodeMutex.Lock()
-	nodeList = append(nodeList, m)
-	nodeMutex.Unlock()
 }
 
 func addTransaction(m TransactionMessage) {
 	newM := new(TransactionMessage)
 	*newM = m
-	transactionMutex.Lock()
-	transactionMap[m.TransactionID] = len(transactionList)
-	transactionList = append(transactionList, newM)
-	transactionMutex.Unlock()
+	if _, exists := transactionMap[m.TransactionID]; !exists {
+		transactionMap[m.TransactionID] = len(transactionList)
+		transactionList = append(transactionList, newM)
+	} else {
+		Warning.Println("Got Transaction", m.TransactionID, "but already added to local set")
+	}
+}
+
+func addBlock(m Block) {
+	newM := new(Block)
+	*newM = m
+	// TODO: put block in a separate map for pending verification before commiting to block list and propagating
+	if _, exists := blockMap[m.BlockID]; !exists {
+		blockMap[m.BlockID] = len(blockList)
+		blockList = append(blockList, newM)
+	} else {
+		Warning.Println("Got Block", m.BlockID, "but already added to local set")
+	}
+}
+
+func addNode(m ConnectionMessage) {
+	newM := new(ConnectionMessage)
+	*newM = m
+	// TODO: put block in a separate map for pending verification before commiting to block list and propagating
+	if _, exists := nodeMap[m.NodeName]; !exists {
+		nodeMap[m.NodeName] = len(nodeList)
+		nodeList = append(nodeList, newM)
+	} else {
+		Warning.Println("Got Node", m.NodeName, "but already added to local set")
+	}
 }
 
 // Find takes a slice and looks for an element in it. If found it will
@@ -81,12 +104,11 @@ func nodecommToConnectionmessage(nodePtr *nodeComm) *ConnectionMessage {
 
 func debugPrintTransactions() {
 	for {
-		time.Sleep(POLLINGPERIOD * time.Second)
-
-		// print transactions for debugging and verification purposes
-		Info.Println("\n")
+		time.Sleep(POLLINGPERIOD * 5 * time.Millisecond)
+		// print Transactions for debugging and verification purposes
+		Debug.Println("\nCurrent Transactions:")
 		for _, val := range transactionList {
-			Info.Println(*val)
+			Debug.Println(*val)
 		}
 	}
 }

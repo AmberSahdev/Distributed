@@ -15,6 +15,7 @@ import (
 
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
 var (
+	Debug   *log.Logger
 	Info    *log.Logger
 	Warning *log.Logger
 	Error   *log.Logger
@@ -49,7 +50,7 @@ var transactionMutex sync.RWMutex
 var blockMutex sync.RWMutex
 
 func main() {
-	initLogging(os.Stdout, os.Stdout, os.Stderr)
+	initLogging(os.Stdout, ioutil.Discard, os.Stdout, os.Stderr)
 	initGob()
 	arguments := os.Args
 	if len(arguments) != 3 {
@@ -87,14 +88,19 @@ func main() {
 
 	go configureGossipProtocol()
 
-	// go debugPrintTransactions() // TODO: remove later
+	go debugPrintTransactions() // TODO: remove later
 
 	handleServiceComms(mp2ServiceAddr)
 }
 
 /**************************** Setup Functions ****************************/
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
-func initLogging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
+func initLogging(debugHandle io.Writer, infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
+
+	Debug = log.New(debugHandle,
+		"DEBUG: ",
+		log.Ltime|log.Lshortfile)
+
 	Info = log.New(infoHandle,
 		"INFO: ",
 		log.Ltime|log.Lshortfile)
@@ -106,14 +112,16 @@ func initLogging(infoHandle io.Writer, warningHandle io.Writer, errorHandle io.W
 	Error = log.New(errorHandle,
 		"ERROR: ",
 		log.Ltime|log.Lshortfile)
+
 }
 
 func initGob() {
 	gob.Register(ConnectionMessage{})
 	gob.Register(TransactionMessage{})
 	gob.Register(DiscoveryMessage{})
-	gob.Register(TransactionRequest{})
+	gob.Register(BatchGossipMessage{})
 	gob.Register(DiscoveryReplyMessage{})
+	gob.Register(GossipRequestMessage{})
 }
 
 // Get preferred outbound ip of this machine
@@ -156,13 +164,13 @@ func handleServiceComms(mp2ServiceAddr string) {
 		//    1.3 QUIT/DIE
 		switch mp2ServiceMsg := incomingMsg.(type) {
 		case string:
-			msgType := strings.Split(mp2ServiceMsg, " ")[0]
+			mp2ServiceMsgArr := strings.Split(mp2ServiceMsg, " ")
+			msgType := mp2ServiceMsgArr[0]
 			// TODO: replace this with a case statement
 			if msgType == "TRANSACTION" {
 				// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 				//fmt.Println("received mp2_service transaction")
 				var transactionID TransID
-				mp2ServiceMsgArr := strings.Split(mp2ServiceMsg, " ")
 				transactionTime, err := strconv.ParseFloat(mp2ServiceMsgArr[1], 64)
 				check(err)
 				transactionIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
@@ -176,13 +184,24 @@ func handleServiceComms(mp2ServiceAddr string) {
 				transaction := new(TransactionMessage)
 				copy(transactionID[:], transactionIDSlice[:TranSize])
 				*transaction = TransactionMessage{transactionTime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
+				transactionMutex.Lock()
 				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+				transactionMutex.Unlock()
 			} else if msgType == "INTRODUCE" {
 				// Example: INTRODUCE node2 172.22.156.3 4567
 				print(mp2ServiceMsg, "\n")
 				node := new(nodeComm)
-				node.nodeName = strings.Split(mp2ServiceMsg, " ")[1]
-				node.address = strings.Split(mp2ServiceMsg, " ")[2] + ":" + strings.Split(mp2ServiceMsg, " ")[3]
+				node.nodeName = mp2ServiceMsgArr[1]
+				node.address = mp2ServiceMsgArr[2] + ":" + mp2ServiceMsgArr[3]
+				myConnMsg := new(ConnectionMessage)
+				*myConnMsg = ConnectionMessage{
+					NodeName: node.nodeName,
+					IPaddr:   mp2ServiceMsgArr[2],
+					Port:     mp2ServiceMsgArr[3],
+				}
+				nodeMutex.Lock()
+				addNode(*myConnMsg)
+				nodeMutex.Unlock()
 				connectToNode(node)
 				neighborMutex.Lock()
 				addNeighbor(node)

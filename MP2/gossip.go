@@ -49,7 +49,7 @@ func (node *nodeComm) handleOutgoingMessages() {
 		err := tcpEnc.Encode(sendMsg)
 		Info.Println("Sending", *sendMsg, "to", node.nodeName)
 		if err != nil {
-			Error.Println("Failed to send Message, receiver down?")
+			Error.Println("Failed to send Message, error:", err)
 			_ = node.conn.Close()
 			return
 		}
@@ -109,9 +109,64 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				neighborMutex.Unlock()
 			}
 
-		case TransactionMessage:
+		case BatchGossipMessage:
 			Info.Println("Received transaction", m, "from", node.nodeName)
-			addTransaction(m)
+			transactionMutex.Lock()
+			for _, curTransaction := range m.BatchTransactions {
+				addTransaction(*curTransaction)
+			}
+			transactionMutex.Unlock()
+
+			blockMutex.Lock()
+			for _, curBlock := range m.BatchBlocks {
+				addBlock(*curBlock)
+			}
+			blockMutex.Unlock()
+
+			nodeMutex.Lock()
+			for _, curNode := range m.BatchNodes {
+				addNode(*curNode)
+			}
+			nodeMutex.Unlock()
+
+		case GossipRequestMessage:
+			nodeBatch := make([]*ConnectionMessage, 0)
+
+			nodeMutex.RLock()
+			for _, nodeName := range m.NodesNeeded {
+				if ind, exists := nodeMap[nodeName]; exists {
+					nodeBatch = append(nodeBatch, nodeList[ind])
+				} else {
+					Warning.Println("This node claimed to have node:", nodeName, "but doesn't anymore!")
+				}
+			}
+			nodeMutex.RUnlock()
+
+			transactionBatch := make([]*TransactionMessage, 0)
+			transactionMutex.RLock()
+			for _, transactionID := range m.TransactionsNeeded {
+				if ind, exists := transactionMap[transactionID]; exists {
+					transactionBatch = append(transactionBatch, transactionList[ind])
+				} else {
+					Warning.Println("This node claimed to have node:", transactionID, "but doesn't anymore!")
+				}
+			}
+			transactionMutex.RUnlock()
+
+			blockBatch := make([]*Block, 0)
+			blockMutex.RLock()
+			for _, blockID := range m.BlocksNeeded {
+				if ind, exists := blockMap[blockID]; exists {
+					blockBatch = append(blockBatch, blockList[ind])
+				} else {
+					Warning.Println("This node claimed to have node:", blockID, "but doesn't anymore!")
+				}
+			}
+			blockMutex.RUnlock()
+
+			response := new(BatchGossipMessage)
+			*response = BatchGossipMessage{transactionBatch, nodeBatch, blockBatch}
+			node.outbox <- *response
 
 		case DiscoveryMessage:
 			Info.Println("Processing Discovery Message:", m, "from", node.nodeName)
@@ -125,7 +180,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				blockMutex.RLock()
 				blocksPendingTransmission := make([]BlockID, 0)
 				for ; lastSentBlockIndex < len(blockList)-1; lastSentBlockIndex++ {
-					blocksPendingTransmission = append(blocksPendingTransmission, blockList[lastSentBlockIndex+1].blockID)
+					blocksPendingTransmission = append(blocksPendingTransmission, blockList[lastSentBlockIndex+1].BlockID)
 				}
 				blockMutex.RUnlock()
 				transactionMutex.RLock()
@@ -140,55 +195,40 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			} else {
 				panic("ERROR received DiscoveryMessage with request false")
 			}
+
 		case DiscoveryReplyMessage:
-			//TODO
-			panic("Got Discovery Reply TBD")
-		case TransactionRequest:
-			Info.Println("Processing Transaction Request:", m, "from", node.nodeName)
+			nodesNeeded := make([]string, 0)
 
-			// TODO: revist after blockchain discussion
-			if m.Request == true && len(m.TransactionIDs) == 0 {
-				// send all your TransactionIDs
-				l := max(0, len(transactionList)-lastSentTransactionIndex)
-				TransactionIDs := make([]TransID, l)
-
-				j := 0
-				for i := lastSentTransactionIndex; i < len(transactionList); i++ {
-					TransactionIDs[j] = transactionList[i].TransactionID
-					j++
-				}
-				msg := new(Message)
-				*msg = TransactionRequest{false, TransactionIDs}
-				node.outbox <- *msg
-
-			} else if m.Request == true && len(m.TransactionIDs) != 0 {
-				// send requested TransactionIDs's corresponding TransactionMessage
-				for _, transactionID := range m.TransactionIDs {
-					exists, transactionPtr := findTransaction(transactionID)
-					if exists {
-						m := new(Message)
-						*m = *transactionPtr
-						node.outbox <- *m
-					} else {
-						panic("ERROR You should not receive request for a transactionID that you do not have")
-					}
-				}
-			} else if m.Request == false {
-				// you have received list of transactionIDs other node has
-				// check if you have the received TransactionIDs
-				if len(m.TransactionIDs) != 0 {
-					var newTransactionIDs []TransID
-					for _, transactionID := range m.TransactionIDs {
-						exists, _ := findTransaction(transactionID)
-						if !exists {
-							newTransactionIDs = append(newTransactionIDs, transactionID)
-						}
-					}
-					msg := new(Message)
-					*msg = TransactionRequest{true, newTransactionIDs}
-					node.outbox <- *msg
+			nodeMutex.RLock()
+			for _, nodeName := range m.NodesPendingTransmission {
+				if _, exists := nodeMap[nodeName]; !exists {
+					nodesNeeded = append(nodesNeeded, nodeName)
 				}
 			}
+			nodeMutex.RUnlock()
+
+			transactionsNeeded := make([]TransID, 0)
+			transactionMutex.RLock()
+			for _, transactionID := range m.TransactionsPendingTransmission {
+				if _, exists := transactionMap[transactionID]; !exists {
+					transactionsNeeded = append(transactionsNeeded, transactionID)
+				}
+			}
+			transactionMutex.RUnlock()
+
+			blocksNeeded := make([]BlockID, 0)
+			blockMutex.RLock()
+			for _, blockID := range m.BlocksPendingTransmission {
+				if _, exists := blockMap[blockID]; !exists {
+					blocksNeeded = append(blocksNeeded, blockID)
+				}
+			}
+			blockMutex.RUnlock()
+
+			result := new(GossipRequestMessage)
+			*result = GossipRequestMessage{nodesNeeded, blocksNeeded, transactionsNeeded}
+			node.outbox <- *result
+
 		default:
 			if m == "DISCONNECTED" || m == nil {
 				node.conn.Close()
@@ -223,11 +263,11 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 
 func configureGossipProtocol() {
 	//   one per NodeComm
-	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, transactions, neigbors
+	//   Algorithm: Every POLLINGPERIOD seconds, ask for transactionIDs, Transactions, neigbors
 	//   handle messages of the following type:
-	//		 - poll neighbor for transactions (POLL:TRANSACTION_IDs)
+	//		 - poll neighbor for Transactions (POLL:TRANSACTION_IDs)
 	//     - send pull request
-	//     - send transactions upon a pull request
+	//     - send Transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
 	for {
 		randVal := time.Duration(rand.Intn(500))                 // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
