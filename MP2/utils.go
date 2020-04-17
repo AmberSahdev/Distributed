@@ -129,3 +129,11 @@ func removeNeighbor(node *nodeComm) {
 	}
 	Error.Println("Failed to delete", node.nodeName, "from neighborList!")
 }
+
+/*
+DiscoveryReplyMessage
+DiscoveryMessage
+GossipRequestMessage
+BatchGossipMessage
+ConnectionMessage
+*/

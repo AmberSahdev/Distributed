@@ -249,7 +249,7 @@ func handleServiceReceiving() {
 				mp2Service.inbox <- msg
 			}
 		}
-		logBandwidth(msglen)
+		logBandwidth(nil, msglen)
 	}
 }
 
