@@ -4,8 +4,4 @@ all:
 
 clean:
 	@echo "deleting binaries"
-	rm main launcher 
-
-launcher:
-	@echo "deleting binaries"
-	go build launcher.go
+	rm main

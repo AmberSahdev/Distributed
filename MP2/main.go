@@ -50,7 +50,7 @@ var transactionMutex sync.RWMutex
 var blockMutex sync.RWMutex
 
 func main() {
-	initLogging(os.Stdout, ioutil.Discard, os.Stdout, os.Stderr)
+	initLogging(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	initGob()
 	arguments := os.Args
 	if len(arguments) != 3 {
@@ -98,9 +98,8 @@ func main() {
 func initLogging(debugHandle io.Writer, infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
 
 	Debug = log.New(debugHandle,
-		"DEBUG: ", 0)
-
-	//log.Ltime|log.Lshortfile)
+		"DEBUG: ",
+		log.Ltime|log.Lshortfile)
 
 	Info = log.New(infoHandle,
 		"INFO: ",
@@ -190,7 +189,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 				transactionMutex.Unlock()
 			} else if msgType == "INTRODUCE" {
 				// Example: INTRODUCE node2 172.22.156.3 4567
-				print(mp2ServiceMsg, "\n")
+				Info.Println(mp2ServiceMsg)
 				node := new(nodeComm)
 				node.nodeName = mp2ServiceMsgArr[1]
 				node.address = mp2ServiceMsgArr[2] + ":" + mp2ServiceMsgArr[3]
