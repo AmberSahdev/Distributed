@@ -80,7 +80,7 @@ func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []*Tran
 	// TODO: initialize account balances to parent block values
 	// operate on
 	newAccountBalances := make(map[AccountID]uint64)
-	return newAccountBalances, transactionList[:2000]
+	return newAccountBalances, transactionList[:MaxTransactionsInBlock]
 }
 
 func addTransactionsToProcessedSet(newBlock *Block) {
