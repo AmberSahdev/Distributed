@@ -257,6 +257,7 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 		err = tcpDec.Decode(newM)
 		Info.Println("Received", *newM, "from", node.nodeName)
 		node.inbox <- *newM
+		// logBandwidth(fmt.Sprintf("%d", (newM).size())) // TODO: come back to this later
 	}
 	node.inbox <- "DISCONNECTED"
 	close(node.inbox)

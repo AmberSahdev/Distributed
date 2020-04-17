@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/gob"
 	"encoding/hex"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -50,7 +49,7 @@ var transactionMutex sync.RWMutex
 var blockMutex sync.RWMutex
 
 func main() {
-	initLogging(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+	initLogging()
 	initGob()
 	arguments := os.Args
 	if len(arguments) != 3 {
@@ -89,14 +88,15 @@ func main() {
 	go configureGossipProtocol()
 
 	go debugPrintTransactions() // TODO: remove later
+	go logging()
 
 	handleServiceComms(mp2ServiceAddr)
 }
 
 /**************************** Setup Functions ****************************/
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
-func initLogging(debugHandle io.Writer, infoHandle io.Writer, warningHandle io.Writer, errorHandle io.Writer) {
-
+func initLogging() {
+	debugHandle, infoHandle, warningHandle, errorHandle := os.Stdout, os.Stdout, os.Stdout, os.Stderr
 	Debug = log.New(debugHandle,
 		"DEBUG: ",
 		log.Ltime|log.Lshortfile)
@@ -112,7 +112,6 @@ func initLogging(debugHandle io.Writer, infoHandle io.Writer, warningHandle io.W
 	Error = log.New(errorHandle,
 		"ERROR: ",
 		log.Ltime|log.Lshortfile)
-
 }
 
 func initGob() {
@@ -250,6 +249,7 @@ func handleServiceReceiving() {
 				mp2Service.inbox <- msg
 			}
 		}
+		logBandwidth(msglen)
 	}
 }
 
