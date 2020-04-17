@@ -39,10 +39,9 @@ func blockchain() {
 	//    propogate new blocks to your neighbors
 }
 
+// TODO abolish all Sprintfs
 func askProofOfWork(b *Block) {
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%v", *b)))
-
 	hash := fmt.Sprintf("%x", h.Sum(nil))
 	serviceMsg := "SOLVE " + hash + "\n"
 	mp2Service.outbox <- serviceMsg
@@ -64,34 +63,22 @@ func askVerifyBlock(b *Block) {
 }
 
 func deleteDuplicateTransactions(b *Block) {
-	var toDelete []TransID
 	transactionMutex.Lock()
+	// remove from transactionList
 	for _, transaction := range b.Transactions {
 		// remove from transactionMap
-		_, exists := transactionMap[transaction.TransactionID]
+		ind, exists := transactionMap[transaction.TransactionID]
 		if exists {
+			transactionList[ind] = nil
 			delete(transactionMap, transaction.TransactionID)
-			toDelete = append(toDelete, transaction.TransactionID)
 		}
 	}
-	// remove from transactionList
-	for i, t := range transactionList {
-		for _, d := range toDelete {
-			if t.TransactionID == d {
-				transactionList[i] = transactionList[len(transactionList)-1] // Copy last element to index i.
-				transactionList[len(transactionList)-1] = nil                // Erase last element (write zero value).
-				transactionList = transactionList[:len(transactionList)-1]   // Truncate slice.
-			}
+	newTransactionList := make([]*TransactionMessage, 0)
+	for _, val := range transactionList {
+		if val != nil {
+			newTransactionList = append(newTransactionList, val)
 		}
 	}
+	transactionList = newTransactionList
 	transactionMutex.Unlock()
-}
-
-func resetCurrentIndexPointers() {
-	// TODO: go through all nodes and reset their CurrentIndexPointers to 0
-}
-
-func findFork() {
-	// find the fork in the blockchain
-	//
 }

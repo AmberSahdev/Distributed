@@ -3,7 +3,6 @@ package main
 import (
 	"math"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -30,13 +29,15 @@ func min(x, y int) int {
 }
 
 // TODO: Make this a goroutine
-func connectToNode(node *nodeComm) {
+func connectToNode(node *nodeComm) error {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
 	node.inbox = make(chan Message, 65536)
 	node.outbox = make(chan Message, 65536)
 	node.conn, err = net.Dial("tcp", node.address)
-	check(err) // TODO: maybe dont crash here IMPORTANT!!!
+	if err != nil {
+		return err
+	}
 	m := new(ConnectionMessage)
 	*m = ConnectionMessage{
 		NodeName: localNodeName,
@@ -44,6 +45,7 @@ func connectToNode(node *nodeComm) {
 		Port:     localPort,
 	}
 	node.outbox <- *m
+	return nil
 }
 
 func addTransaction(m TransactionMessage) {
@@ -92,14 +94,6 @@ func findTransaction(key TransID) (bool, *TransactionMessage) {
 	} else {
 		return false, nil
 	}
-}
-
-func nodecommToConnectionmessage(nodePtr *nodeComm) *ConnectionMessage {
-	ret := new(ConnectionMessage)
-	ret.NodeName = nodePtr.nodeName
-	ret.IPaddr = strings.Split(nodePtr.address, ":")[0]
-	ret.Port = strings.Split(nodePtr.address, ":")[1]
-	return ret
 }
 
 func debugPrintTransactions() {

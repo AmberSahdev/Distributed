@@ -15,7 +15,9 @@ func setupNeighbor(conn net.Conn) (*nodeComm, *gob.Decoder) {
 	tcpDec := gob.NewDecoder(conn)
 	var incoming Message
 	err := tcpDec.Decode(&incoming)
-	check(err)
+	if err != nil {
+		return nil, nil
+	}
 	myMsg := new(Message)
 	*myMsg = incoming
 	switch m := (*myMsg).(type) {
@@ -231,7 +233,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 
 		default:
 			if m == "DISCONNECTED" || m == nil {
-				node.conn.Close()
+				_ = node.conn.Close()
 				node.isConnected = false
 				neighborMutex.Lock()
 				removeNeighbor(node)
@@ -239,10 +241,10 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				Info.Println("\nreturning from handle_node_comm for ", node.nodeName)
 				return
 			}
-			Warning.Println("Unknown Type in handle_node_comm ", m, "type:", reflect.TypeOf(m))
+			Warning.Println("Unknown Type in handleNodeComm", m, "type:", reflect.TypeOf(m))
 		}
 	}
-	panic("ERROR: outside for loop in handle_node_comm")
+	Error.Println("Outside for loop in handleNodeComm")
 }
 
 func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
@@ -269,22 +271,46 @@ func configureGossipProtocol() {
 	//     - send pull request
 	//     - send Transactions upon a pull request
 	//     - periodically ask neighbor for its neighbors (send a string in the format: POLL:NEIGHBORS)
+	go correctNumNeighbors()
+	randVal := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	for {
-		randVal := time.Duration(rand.Intn(500))                 // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 		pollANeighbor()                                          // TODO: Polls a Neighbor (iterate over connectedNodes in order)
 		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
-		correctNumNeighbors()                                    //TODO: checks if number of Neighbors is too low, if so, randomly connect to a node from nodeList not in neighborMap
 	}
 }
 
 func correctNumNeighbors() {
-	nodeMutex.RLock()
-	numNodes := len(nodeList)
-	nodeMutex.RUnlock()
-	desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes))))+2)
-	if desiredNumConnections < numConns {
-		Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
-		// TODO: successfully connect to 1 of remaining nodes randomly from nodeList
+	randVal := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+	for {
+		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
+		nodeMutex.RLock()
+		numNodes := len(nodeList) - 1
+		nodeMutex.RUnlock()
+		desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes+1))))+3)
+		for i := 0; desiredNumConnections > numConns && i < min(numNodes, 10); i++ {
+			if i == 0 {
+				Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
+			}
+			candidateNeighbor := rand.Intn(numNodes) + 1 // Do not connect to yourself
+			node := new(nodeComm)
+			nodeMutex.RLock()
+			node.nodeName = nodeList[candidateNeighbor].NodeName
+			node.address = nodeList[candidateNeighbor].IPaddr + ":" + nodeList[candidateNeighbor].Port
+			nodeMutex.RUnlock()
+			neighborMutex.RLock()
+			if _, exists := neighborMap[node.nodeName]; !exists {
+				neighborMutex.RUnlock()
+				err := connectToNode(node)
+				if err == nil {
+					neighborMutex.Lock()
+					addNeighbor(node)
+					neighborMutex.Unlock()
+					go node.handleNodeComm(nil)
+				}
+			} else {
+				neighborMutex.RUnlock()
+			}
+		}
 	}
 }
 
