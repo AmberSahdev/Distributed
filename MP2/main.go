@@ -194,16 +194,19 @@ func handleServiceComms(mp2ServiceAddr string) {
 				node := new(nodeComm)
 				node.nodeName = mp2ServiceMsgArr[1]
 				node.address = mp2ServiceMsgArr[2] + ":" + mp2ServiceMsgArr[3]
-				myConnMsg := new(ConnectionMessage)
-				*myConnMsg = ConnectionMessage{
+				newConnMsg := new(ConnectionMessage)
+				*newConnMsg = ConnectionMessage{
 					NodeName: node.nodeName,
 					IPaddr:   mp2ServiceMsgArr[2],
 					Port:     mp2ServiceMsgArr[3],
 				}
 				nodeMutex.Lock()
-				addNode(*myConnMsg)
+				addNode(*newConnMsg)
 				nodeMutex.Unlock()
-				connectToNode(node)
+				err := connectToNode(node)
+				if err != nil {
+					continue
+				}
 				neighborMutex.Lock()
 				addNeighbor(node)
 				neighborMutex.Unlock()
@@ -254,11 +257,17 @@ func handleServiceReceiving() {
 func handleIncomingConns() {
 	var conn net.Conn
 	listener, err := net.Listen("tcp", ":"+localPort) // open port
-	check(err)
-	for err == nil {
-		conn, err = listener.Accept()
-		node, tcpDec := setupNeighbor(conn)
-		go node.handleNodeComm(tcpDec) // open up a go routine
+	if err == nil {
+		for {
+			conn, err = listener.Accept()
+			if err == nil {
+				node, tcpDec := setupNeighbor(conn)
+				if node == nil {
+					continue
+				}
+				go node.handleNodeComm(tcpDec) // open up a go routine
+			}
+		}
 	}
 	_ = listener.Close()
 	Error.Println("Stopped listening because of error")
