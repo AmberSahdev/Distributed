@@ -41,7 +41,6 @@ func setupNeighbor(conn net.Conn) (*nodeComm, *gob.Decoder) {
 }
 
 /**************************** Go Routines ****************************/
-// TODO: create a dedicated TCP thread for doing all the outgoing communications and push to it via an outbox channel
 func (node *nodeComm) handleOutgoingMessages() {
 	tcpEnc := gob.NewEncoder(node.conn)
 	var m Message
@@ -65,9 +64,6 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 	go node.receiveIncomingData(tcpDec) // put messages of this conn into node.inbox
 	go node.handleOutgoingMessages()
 
-	// TODO: handle outbox goroutine responsible for all outgoing TCP comms
-
-	// TODO: make lastSentTransactionIndex part of the node struct so you can easily reset it
 	lastSentBlockIndex := -1 // to send only new blocks, need to keep track of last sent index
 	lastSentNodeIndex := -1  // to send only new nodes, need to keep track of last sent index
 
@@ -77,8 +73,6 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			neighborMutex.Lock()
 			Info.Println("Processing Connection Message:", m, "from", node.nodeName)
 			if incomingNode, exists := neighborMap[m.NodeName]; !exists {
-
-				// TODO: you never opened the conn
 				Error.Println("How Did we get here?")
 				newNode := new(nodeComm)
 				newNode.nodeName = m.NodeName
@@ -264,24 +258,24 @@ func configureGossipProtocol() {
 	go correctNumNeighbors()
 	randVal := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	for {
-		pollANeighbor()                                          // TODO: Polls a Neighbor (iterate over connectedNodes in order)
-		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
+		pollANeighbor()
+		time.Sleep((GOSSIPPOLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
 	}
 }
 
 func correctNumNeighbors() {
 	randVal := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	for {
-		time.Sleep((POLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
+		time.Sleep((CONNPOLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
 		nodeMutex.RLock()
-		numNodes := len(nodeList) - 1 // TODO: Refactor to numOtherNodes
+		numOtherNodes := len(nodeList) - 1
 		nodeMutex.RUnlock()
-		desiredNumConnections := min(numNodes, int(math.Ceil(math.Log2(float64(numNodes+1))))+3)
-		for i := 0; desiredNumConnections > numConns && i < min(numNodes, 10); i++ {
+		desiredNumConnections := min(numOtherNodes, int(math.Ceil(math.Log2(float64(numOtherNodes+1))))+3)
+		for i := 0; desiredNumConnections > numConns && i < min(numOtherNodes, 10); i++ {
 			if i == 0 {
 				Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
 			}
-			candidateNeighbor := rand.Intn(numNodes) + 1 // Do not connect to yourself
+			candidateNeighbor := rand.Intn(numOtherNodes) + 1 // Do not connect to yourself
 			node := new(nodeComm)
 			nodeMutex.RLock()
 			node.nodeName = nodeList[candidateNeighbor].NodeName

@@ -27,7 +27,6 @@ func min(x, y int) int {
 	return x
 }
 
-// TODO: Make this a goroutine
 func connectToNode(node *nodeComm) error {
 	// called when this node is trying to connect to a neighbor after INTRODUCE message
 	var err error
@@ -61,7 +60,6 @@ func addTransaction(m TransactionMessage) {
 func addBlock(m Block, isLocal bool) {
 	newM := new(Block)
 	*newM = m
-	// TODO: put block in a separate map for pending verification before commiting to block list and propagating
 	blockMutex.Lock()
 	if _, exists := blockMap[m.BlockID]; !exists {
 		myBlock := new(BlockInfo)
@@ -87,7 +85,6 @@ func addBlock(m Block, isLocal bool) {
 func addNode(m ConnectionMessage) {
 	newM := new(ConnectionMessage)
 	*newM = m
-	// TODO: put block in a separate map for pending verification before commiting to block list and propagating
 	if _, exists := nodeMap[m.NodeName]; !exists {
 		nodeMap[m.NodeName] = len(nodeList)
 		nodeList = append(nodeList, newM)
@@ -98,7 +95,7 @@ func addNode(m ConnectionMessage) {
 
 func debugPrintTransactions() {
 	for {
-		time.Sleep(POLLINGPERIOD * 5 * time.Millisecond)
+		time.Sleep(GOSSIPPOLLINGPERIOD * 5 * time.Millisecond)
 		// print Transactions for debugging and verification purposes
 		Debug.Println("\nCurrent Transactions:")
 		for _, val := range transactionList {
