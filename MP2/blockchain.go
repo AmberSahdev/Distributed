@@ -19,6 +19,7 @@ func blockchain() {
 			curLongestChainLeafMutex.Lock()
 			curLongestChainLeaf = newValidBlock
 			curLongestChainLeafMutex.Unlock()
+			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]))
 			processedTransactionMutex.Lock()
 			addTransactionsToProcessedSet(newValidBlock)
 			processedTransactionMutex.Unlock()
