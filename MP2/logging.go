@@ -53,6 +53,22 @@ func logBandwidth(m *Message, numBytes int) {
 	fBandwidth.WriteString(strconv.Itoa(numBytes) + " ")
 }
 
+func logBandwidthBlock(b *Block) {
+	// Format to call it:
+	// Either send it a *Message to compute the size of, or send it numBytes
+	numBytes := 0
+	if b != nil {
+		var network bytes.Buffer // Stand-in for a network connection
+		enc := gob.NewEncoder(&network)
+		err := enc.Encode(*b)
+		if err != nil {
+			Error.Println("logBandwidthBlock error in encoding to byte buffer")
+		}
+		numBytes = len(network.Bytes())
+	}
+	fBandwidth.WriteString(strconv.Itoa(numBytes) + " ")
+}
+
 func create_logging_files() (*os.File, *os.File) {
 	// fTransactions: format: timeLogged transactionID trasactionID'sTimestamp
 	fTransactions, err := os.Create("eval_logs/transactions_" + localNodeName + ".txt")
