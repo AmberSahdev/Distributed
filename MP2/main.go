@@ -228,6 +228,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 			} else if msgType == "VERIFY" {
 				if mp2ServiceMsgArr[1] == "OK" {
 					// Block mining verified, push to blockchain thread
+					Info.Println(mp2ServiceMsgArr)
 					result := new(BlockID)
 					mp2ServiceMsgArr[2] = strings.Repeat("0", (64-len(mp2ServiceMsgArr[2]))) + mp2ServiceMsgArr[2]
 					blockIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
@@ -235,7 +236,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 					copy(result[:], blockIDSlice[:sha256.Size])
 					serviceVerifiedBlockIDs <- *result
 				} else {
-					Warning.Println("Got Rejection of verification for:", mp2ServiceMsgArr[2], mp2ServiceMsgArr[3])
+					Warning.Println("Got Rejection of verification for:", mp2ServiceMsgArr)
 				}
 			} else if msgType == "SOLVED" {
 				var solvedBlockID BlockID

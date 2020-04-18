@@ -47,7 +47,7 @@ func blockchain() {
 			curLongestChainLeafMutex.Lock()
 			curLongestChainLeaf = newValidBlock
 			curLongestChainLeafMutex.Unlock()
-			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]))
+			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]), "current height:", curLongestChainLeaf.BlockHeight)
 
 		}
 	}
@@ -228,6 +228,16 @@ func computeBlockID(curBlock *Block) BlockID {
 func askVerifyBlock(b *Block) {
 	hash := hex.EncodeToString(b.BlockID[:])
 	proofOfWork := hex.EncodeToString(b.BlockProof[:])
+
+	// removing prefixed 0s
+	var i int
+	for i = 0; i < len(proofOfWork); i++ {
+		if string(proofOfWork[i]) != "0" {
+			break
+		}
+	}
+	proofOfWork = proofOfWork[i:]
+
 	serviceMsg := "VERIFY " + hash + " " + proofOfWork + "\n"
 	mp2Service.outbox <- serviceMsg
 	Info.Println(serviceMsg)
