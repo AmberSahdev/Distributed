@@ -21,7 +21,8 @@ var (
 	Error   *log.Logger
 )
 
-const MaxTransactionsInBlock = 20
+const MinimiumTransactionsInBlock = 20
+const MaxTransactionsInBlock = 2000
 const GOSSIPPOLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
 const CONNPOLLINGPERIOD = 1000   // polling period for connecting to new nodes.
 
