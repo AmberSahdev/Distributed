@@ -198,9 +198,12 @@ func deleteDuplicateTransactions(b *Block) {
 		}
 	}
 	newTransactionList := make([]*TransactionMessage, 0)
+	newTransListInd := 0
 	for _, val := range transactionList {
 		if val != nil {
+			transactionMap[val.TransactionID] = newTransListInd
 			newTransactionList = append(newTransactionList, val)
+			newTransListInd++
 		}
 	}
 	transactionList = newTransactionList
