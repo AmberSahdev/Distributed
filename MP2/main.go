@@ -229,6 +229,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 				if mp2ServiceMsgArr[1] == "OK" {
 					// Block mining verified, push to blockchain thread
 					result := new(BlockID)
+					mp2ServiceMsgArr[2] = strings.Repeat("0", (64-len(mp2ServiceMsgArr[2]))) + mp2ServiceMsgArr[2]
 					blockIDSlice, err := hex.DecodeString(mp2ServiceMsgArr[2])
 					check(err)
 					copy(result[:], blockIDSlice[:sha256.Size])
@@ -239,9 +240,12 @@ func handleServiceComms(mp2ServiceAddr string) {
 			} else if msgType == "SOLVED" {
 				var solvedBlockID BlockID
 				var solvedProof BlockPW
+				mp2ServiceMsgArr[1] = strings.Repeat("0", (64-len(mp2ServiceMsgArr[1]))) + mp2ServiceMsgArr[1] // made it even length because service drops 0s
 				tmp, err := hex.DecodeString(mp2ServiceMsgArr[1])
 				check(err)
 				copy(solvedBlockID[:], tmp[:sha256.Size])
+				Info.Println("inside SOLVED", mp2ServiceMsgArr[:])
+				mp2ServiceMsgArr[2] = strings.Repeat("0", (64-len(mp2ServiceMsgArr[2]))) + mp2ServiceMsgArr[2]
 				tmp, err = hex.DecodeString(mp2ServiceMsgArr[2])
 				check(err)
 				copy(solvedProof[:], tmp[:sha256.Size])

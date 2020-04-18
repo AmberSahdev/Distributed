@@ -50,7 +50,7 @@ func (node *nodeComm) handleOutgoingMessages() {
 		err := tcpEnc.Encode(sendMsg)
 		// Info.Println("Sending", *sendMsg, "to", node.nodeName)
 		if err != nil {
-			Error.Println("Failed to send Message:", sendMsg, "error:", err)
+			Error.Println("Failed to send Message:", *sendMsg, "error:", err)
 			_ = node.conn.Close()
 			return
 		}

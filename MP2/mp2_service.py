@@ -82,8 +82,8 @@ async def handle_connection(reader, writer):
                             balances[tx_from] -= tx_amount
                         balances[tx_to] += tx_amount
                         tx = f"{tx_time:#.6f} {tx_id} {tx_from} {tx_to} {tx_amount}"
-                        print(f"Sending transaction {tx} to {addr}")
-                        print(f"New balances: {tx_from}: {balances[tx_from]}, {tx_to}: {balances[tx_to]}")
+                        #print(f"Sending transaction {tx} to {addr}")
+                        #print(f"New balances: {tx_from}: {balances[tx_from]}, {tx_to}: {balances[tx_to]}")
                         writer.write(f"TRANSACTION {tx}\n".encode())
                         await writer.drain()
                 else:
