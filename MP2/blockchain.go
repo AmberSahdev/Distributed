@@ -166,13 +166,18 @@ func tryMineBlock(curBlock *Block) {
 func computeBlockID(curBlock *Block) BlockID {
 	dataToHash := make([][]byte, 1)
 	dataToHash[0] = curBlock.ParentBlockID[:]
+	//Info.Println("dataToHash 1", dataToHash)
 	for _, curTrans := range curBlock.Transactions {
 		dataToHash = append(dataToHash, curTrans.TransactionID[:])
+		// Info.Println("dataToHash 2", dataToHash)
 	}
-	h := sha256.New()
-	var result [sha256.Size]byte
-	copy(result[:], h.Sum(bytes.Join(dataToHash, nil))[:sha256.Size])
-	return result
+	//Info.Println("dataToHash 2", dataToHash)
+	//h := sha256.New()
+	//var result [sha256.Size]byte
+	//copy(result[:], sha256.Sum256(bytes.Join(dataToHash, nil))[:])
+	//Info.Println("dataToHash 3", bytes.Join(dataToHash, nil))
+	//Info.Println("dataToHash", sha256.Sum256(bytes.Join(dataToHash, nil)))
+	return sha256.Sum256(bytes.Join(dataToHash, nil))
 }
 
 func askVerifyBlock(b *Block) {
