@@ -206,7 +206,7 @@ func tryMineBlock(curBlock *Block) {
 	currentBlockBeingMined = curBlock
 	currentBlockBeingMinedMutex.Unlock()
 	blockIDstr := hex.EncodeToString(curBlock.BlockID[:])
-	Info.Println("Trying to mine Block with ID:", blockIDstr)
+	//Info.Println("Trying to mine Block with ID:", blockIDstr)
 	serviceMsg := "SOLVE " + blockIDstr + "\n"
 	mp2Service.outbox <- serviceMsg
 }
@@ -243,7 +243,7 @@ func askVerifyBlock(b *Block) {
 
 	serviceMsg := "VERIFY " + hash + " " + proofOfWork + "\n"
 	mp2Service.outbox <- serviceMsg
-	Info.Println(serviceMsg)
+	//Info.Println(serviceMsg)
 }
 
 func addRolledBackTransactions(Transactions []TransactionMessage) {
