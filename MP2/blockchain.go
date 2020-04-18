@@ -152,6 +152,7 @@ func handleBlockchainServerVerifies() {
 			verifyChildDependents(newBlockID)
 		} else {
 			parentInf.ChildDependents = append(parentInf.ChildDependents, newBlockID)
+			Warning.Println("Waiting on Parent of", hex.EncodeToString(newBlockID[:]), "to be verified by the service!")
 		}
 		blockMutex.Unlock()
 	}
@@ -182,6 +183,8 @@ func verifyBlock(curBlock *Block) {
 	if curBlock.BlockID == computeBlockID(curBlock) && curBlock.BlockHeight-1 == parentBlock.BlockHeight {
 		if verifyTransactions(curBlock) {
 			askVerifyBlock(curBlock)
+		} else {
+			Warning.Println("Rejected block for invalid blockID hash")
 		}
 	} else {
 		Warning.Println("Rejected block for invalid blockID hash")
