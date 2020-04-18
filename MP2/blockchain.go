@@ -103,7 +103,9 @@ func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []Trans
 	newAccountBalances := make(map[AccountID]uint64)
 	newTransactionList := make([]TransactionMessage, 0)
 
-	newAccountBalances = parentBlock.AccountBalances
+	for k, v := range parentBlock.AccountBalances {
+		newAccountBalances[k] = v
+	}
 
 	i := 0
 	for len(newTransactionList) <= MaxTransactionsInBlock && i < len(transactionList) {
