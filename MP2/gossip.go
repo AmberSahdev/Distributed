@@ -222,7 +222,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 				neighborMutex.Lock()
 				removeNeighbor(node)
 				neighborMutex.Unlock()
-				Warning.Println("\nreturning from handle_node_comm for ", node.nodeName)
+				Warning.Println("returning from handle_node_comm for ", node.nodeName)
 				return
 			}
 			Warning.Println("Unknown Type in handleNodeComm", m, "type:", reflect.TypeOf(m))
@@ -236,14 +236,17 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 		tcpDec = gob.NewDecoder(node.conn)
 	}
 	var err error = nil
-	for err == nil {
+	for {
 		newM := new(Message)
 		err = tcpDec.Decode(newM)
+		if err != nil {
+			break
+		}
 		// Info.Println("Received", *newM, "from", node.nodeName)
 		node.inbox <- *newM
-
 		logBandwidth(newM, 0) // TODO: come back to this later
 	}
+	Warning.Println("Decoding Message failed for node", node.nodeName, "Cause:", err)
 	node.inbox <- "DISCONNECTED"
 	close(node.inbox)
 	Warning.Println("Closing inbox for node", node.nodeName, "Cause:", err)
