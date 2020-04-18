@@ -19,7 +19,7 @@ func blockchain() {
 			curLongestChainLeafMutex.Lock()
 			curLongestChainLeaf = newValidBlock
 			curLongestChainLeafMutex.Unlock()
-			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]))
+			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]), "current height: ", curLongestChainLeaf.BlockHeight)
 			processedTransactionMutex.Lock()
 			addTransactionsToProcessedSet(newValidBlock)
 			processedTransactionMutex.Unlock()
@@ -82,9 +82,23 @@ func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []Trans
 	// operate on
 	newAccountBalances := make(map[AccountID]uint64)
 	newTransactionList := make([]TransactionMessage, 0)
-	for i := 0; i < MaxTransactionsInBlock; i++ {
-		newTransactionList = append(newTransactionList, *transactionList[i])
+
+	newAccountBalances = parentBlock.AccountBalances
+
+	i := 0
+	for len(newTransactionList) <= MaxTransactionsInBlock && i < len(transactionList) {
+		t := transactionList[i]
+		if t.Src == 0 {
+			newAccountBalances[t.Dest] += t.Amount
+			newTransactionList = append(newTransactionList, *t)
+		} else if newAccountBalances[t.Src]-t.Amount >= 0 { // if only the account's balance remainds non negative
+			newAccountBalances[t.Src] -= t.Amount
+			newAccountBalances[t.Dest] += t.Amount
+			newTransactionList = append(newTransactionList, *t)
+		}
+		i++
 	}
+
 	return newAccountBalances, newTransactionList
 }
 
@@ -186,10 +200,11 @@ func computeBlockID(curBlock *Block) BlockID {
 }
 
 func askVerifyBlock(b *Block) {
-	hash := hex.EncodeToString(b.BlockID[:sha256.Size])
-	proofOfWork := hex.EncodeToString(b.BlockProof[:sha256.Size])
+	hash := hex.EncodeToString(b.BlockID[:])
+	proofOfWork := hex.EncodeToString(b.BlockProof[:])
 	serviceMsg := "VERIFY " + hash + " " + proofOfWork + "\n"
 	mp2Service.outbox <- serviceMsg
+	Info.Println(serviceMsg)
 }
 
 func deleteDuplicateTransactions(b *Block) {
@@ -221,5 +236,56 @@ func resetLastSentTransactionIndices() {
 		curNode.lastSentTransactionIndex = -1
 	}
 	neighborMutex.Unlock()
+}
 
+func getForkBlock(b1 *Block, b2 *Block) *Block {
+	var higherBlock *Block // block at higher height
+	var lowerBlock *Block  // block at lower height
+
+	if b1.BlockHeight >= b2.BlockHeight {
+		higherBlock = b1
+		lowerBlock = b2
+	} else {
+		higherBlock = b2
+		lowerBlock = b1
+	}
+
+	// Bring both branches to same height
+	for higherBlock.BlockHeight != lowerBlock.BlockHeight {
+		higherBlock = getParentBlock(higherBlock)
+	}
+
+	// now iterate backwards until you find the same blockID
+	for higherBlock.BlockID != lowerBlock.BlockID {
+		higherBlock = getParentBlock(higherBlock)
+		lowerBlock = getParentBlock(higherBlock)
+	}
+	return higherBlock
+}
+
+func getParentBlock(b *Block) *Block {
+	parent, exists := blockMap[b.ParentBlockID]
+	if !exists {
+		panic("getParentBlock")
+	}
+	return blockList[parent.Index]
+}
+
+func getTransacationInSegment(leaf *Block, fork *Block) []TransactionMessage {
+	segmentTransactions := make([]TransactionMessage, 0)
+	b := leaf
+	for b.BlockID != fork.BlockID {
+		for i := len(b.Transactions) - 1; i >= 0; i-- {
+			segmentTransactions = append(segmentTransactions, b.Transactions[i])
+		}
+		b = getParentBlock(b)
+	}
+	return segmentTransactions
+}
+
+func reverseSliceTransactions(s []TransactionMessage) []TransactionMessage {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+	return s
 }
