@@ -65,7 +65,7 @@ func startNewMine(parentBlock *Block) {
 		transactionMutex.RLock()
 		numPendingTransactions := len(transactionList)
 		transactionMutex.RUnlock()
-		if numPendingTransactions >= MaxTransactionsInBlock {
+		if numPendingTransactions >= MinimiumTransactionsInBlock {
 			break
 		}
 		time.Sleep(TransactionWaitPeriod * time.Millisecond)
