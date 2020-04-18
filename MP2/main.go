@@ -24,7 +24,7 @@ var (
 const MinimiumTransactionsInBlock = 20
 const MaxTransactionsInBlock = 2000
 const GOSSIPPOLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
-const CONNPOLLINGPERIOD = 1000   // polling period for connecting to new nodes.
+const CONNPOLLINGPERIOD = 250    // polling period for connecting to new nodes.
 
 const TranSize = 16      // transactionID Size in bytes (128 bit IDs)
 var localNodeName string // tracks local node's name

@@ -43,8 +43,7 @@ func setupNeighbor(conn net.Conn) (*nodeComm, *gob.Decoder) {
 /**************************** Go Routines ****************************/
 func (node *nodeComm) handleOutgoingMessages() {
 	tcpEnc := gob.NewEncoder(node.conn)
-	var m Message
-	for m = range node.outbox {
+	for m := range node.outbox {
 		sendMsg := new(Message)
 		*sendMsg = m
 		err := tcpEnc.Encode(sendMsg)
@@ -55,6 +54,7 @@ func (node *nodeComm) handleOutgoingMessages() {
 			return
 		}
 	}
+	Warning.Println("Outgoing communication channel closing with channel closure for node", node.nodeName)
 }
 
 func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
@@ -243,7 +243,7 @@ func (node *nodeComm) receiveIncomingData(tcpDec *gob.Decoder) {
 		}
 		// Info.Println("Received", *newM, "from", node.nodeName)
 		node.inbox <- *newM
-		logBandwidth(newM, 0) // TODO: come back to this later
+		logBandwidth(newM, 0)
 	}
 	Warning.Println("Decoding Message failed for node", node.nodeName, "Cause:", err)
 	node.inbox <- "DISCONNECTED"
@@ -268,14 +268,14 @@ func configureGossipProtocol() {
 }
 
 func correctNumNeighbors() {
-	randVal := time.Duration(rand.Intn(500)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
+	randVal := time.Duration(rand.Intn(CONNPOLLINGPERIOD / 2)) // to reduce the stress on the network at the same time because of how I'm testing on the same system with the same clocks
 	for {
 		time.Sleep((CONNPOLLINGPERIOD + randVal) * time.Millisecond) //TODO: Tune Polling Period
 		nodeMutex.RLock()
 		numOtherNodes := len(nodeList) - 1
 		nodeMutex.RUnlock()
 		desiredNumConnections := min((numOtherNodes+1)/2-1, int(math.Ceil(math.Log2(float64(numOtherNodes+1))))+3)
-		for i := 0; desiredNumConnections > numConns && i < min(numOtherNodes, 10); i++ {
+		for i := 0; desiredNumConnections > numConns && i < min(numOtherNodes-numConns, 10); i++ {
 			if i == 0 {
 				Warning.Println("Targeting having", desiredNumConnections, "connections, have", numConns)
 			}

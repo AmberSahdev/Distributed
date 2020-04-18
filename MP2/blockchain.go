@@ -28,9 +28,6 @@ func blockchain() {
 			transactionMutex.Unlock()
 			go startNewMine(curLongestChainLeaf)
 		} else if newValidBlock.BlockHeight > curLongestChainLeaf.BlockHeight { //new Longest chain!
-			// TODO: Find the fork's common ancestor!
-			// remove rolled-back processed Transaction from set
-			// add rolled forward transactions to set
 			blockMutex.RLock()
 			commonAncestorBlock := getForkBlock(newValidBlock, curLongestChainLeaf)
 			transactionsToRollback := getTransactionsInSegment(curLongestChainLeaf, commonAncestorBlock) // Not including commonAncestorBlock
@@ -48,7 +45,6 @@ func blockchain() {
 			curLongestChainLeaf = newValidBlock
 			curLongestChainLeafMutex.Unlock()
 			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]), "current height:", curLongestChainLeaf.BlockHeight)
-
 		}
 	}
 }
@@ -98,8 +94,6 @@ func startNewMine(parentBlock *Block) {
 }
 
 func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []TransactionMessage) {
-	// TODO: initialize account balances to parent block values
-	// operate on
 	newAccountBalances := make(map[AccountID]uint64)
 	newTransactionList := make([]TransactionMessage, 0)
 
@@ -329,11 +323,4 @@ func getTransactionsInSegment(leaf *Block, fork *Block) []TransactionMessage {
 		b = getParentBlock(b)
 	}
 	return segmentTransactions
-}
-
-func reverseSliceTransactions(s []TransactionMessage) []TransactionMessage {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-	return s
 }
