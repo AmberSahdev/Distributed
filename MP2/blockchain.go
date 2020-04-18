@@ -77,11 +77,15 @@ func startNewMine(parentBlock *Block) {
 	tryMineBlock(newBlockToMine)
 }
 
-func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []*TransactionMessage) {
+func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []TransactionMessage) {
 	// TODO: initialize account balances to parent block values
 	// operate on
 	newAccountBalances := make(map[AccountID]uint64)
-	return newAccountBalances, transactionList[:MaxTransactionsInBlock]
+	newTransactionList := make([]TransactionMessage, 0)
+	for i := 0; i < MaxTransactionsInBlock; i++ {
+		newTransactionList = append(newTransactionList, *transactionList[i])
+	}
+	return newAccountBalances, newTransactionList
 }
 
 func addTransactionsToProcessedSet(newBlock *Block) {

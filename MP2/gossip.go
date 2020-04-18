@@ -95,49 +95,49 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			processedTransactionMutex.RLock()
 			for _, curTransaction := range m.BatchTransactions {
 				if _, alreadyProcessed := processedTransactionSet[curTransaction.TransactionID]; !alreadyProcessed {
-					addTransaction(*curTransaction)
+					addTransaction(curTransaction)
 				}
 			}
 			processedTransactionMutex.RUnlock()
 			transactionMutex.Unlock()
 			for _, curBlock := range m.BatchBlocks {
-				addBlock(*curBlock, false)
+				addBlock(curBlock, false)
 			}
 			nodeMutex.Lock()
 			for _, curNode := range m.BatchNodes {
-				addNode(*curNode)
+				addNode(curNode)
 			}
 			nodeMutex.Unlock()
 
 		case GossipRequestMessage:
-			nodeBatch := make([]*ConnectionMessage, 0)
+			nodeBatch := make([]ConnectionMessage, 0)
 
 			nodeMutex.RLock()
 			for _, nodeName := range m.NodesNeeded {
 				if ind, exists := nodeMap[nodeName]; exists {
-					nodeBatch = append(nodeBatch, nodeList[ind])
+					nodeBatch = append(nodeBatch, *nodeList[ind])
 				} else {
 					Warning.Println("This node claimed to have node:", nodeName, "but doesn't anymore!")
 				}
 			}
 			nodeMutex.RUnlock()
 
-			transactionBatch := make([]*TransactionMessage, 0)
+			transactionBatch := make([]TransactionMessage, 0)
 			transactionMutex.RLock()
 			for _, transactionID := range m.TransactionsNeeded {
 				if ind, exists := transactionMap[transactionID]; exists {
-					transactionBatch = append(transactionBatch, transactionList[ind])
+					transactionBatch = append(transactionBatch, *transactionList[ind])
 				} else {
 					Warning.Println("This node claimed to have node:", transactionID, "but doesn't anymore!")
 				}
 			}
 			transactionMutex.RUnlock()
 
-			blockBatch := make([]*Block, 0)
+			blockBatch := make([]Block, 0)
 			blockMutex.RLock()
 			for _, blockID := range m.BlocksNeeded {
 				if curBlockInfo, exists := blockMap[blockID]; exists {
-					blockBatch = append(blockBatch, blockList[curBlockInfo.Index])
+					blockBatch = append(blockBatch, *blockList[curBlockInfo.Index])
 				} else {
 					Warning.Println("This node claimed to have node:", blockID, "but doesn't anymore!")
 				}

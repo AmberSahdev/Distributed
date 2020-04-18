@@ -53,7 +53,7 @@ func addTransaction(m TransactionMessage) {
 	if _, exists := transactionMap[m.TransactionID]; !exists {
 		transactionMap[m.TransactionID] = len(transactionList)
 		transactionList = append(transactionList, newM)
-		logTransaction(*newM)
+		logTransaction(m)
 	} else {
 		Warning.Println("Got Transaction", m.TransactionID, "but already added to local set")
 	}
