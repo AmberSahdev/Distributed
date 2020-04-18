@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"net"
-	"time"
 )
 
 // Performs our current error handling
@@ -99,20 +97,6 @@ func addNode(m ConnectionMessage) {
 	}
 }
 
-func debugPrintTransactions() {
-	for {
-		time.Sleep(GOSSIPPOLLINGPERIOD * 5 * time.Millisecond)
-		// print Transactions for debugging and verification purposes
-
-		Debug.Println("\nCurrent Transactions:")
-		for _, val := range transactionList {
-			t := val.TransactionID
-			transID := fmt.Sprintf("%x", t)
-			Debug.Println(transID)
-		}
-	}
-}
-
 func addNeighbor(newNode *nodeComm) {
 	numConns++
 	neighborMap[newNode.nodeName] = newNode
@@ -130,11 +114,3 @@ func removeNeighbor(node *nodeComm) {
 	}
 	Error.Println("Failed to delete", node.nodeName, "from neighborList!")
 }
-
-/*
-DiscoveryReplyMessage
-DiscoveryMessage
-GossipRequestMessage
-BatchGossipMessage
-ConnectionMessage
-*/
