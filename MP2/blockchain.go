@@ -183,7 +183,6 @@ func computeBlockID(curBlock *Block) BlockID {
 func askVerifyBlock(b *Block) {
 	hash := hex.EncodeToString(b.BlockID[:sha256.Size])
 	proofOfWork := hex.EncodeToString(b.BlockProof[:sha256.Size])
-
 	serviceMsg := "VERIFY " + hash + " " + proofOfWork + "\n"
 	mp2Service.outbox <- serviceMsg
 }

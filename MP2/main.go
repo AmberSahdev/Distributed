@@ -98,7 +98,7 @@ func main() {
 	neighborMutex = sync.RWMutex{}
 	curLongestChainLeafMutex = sync.Mutex{}
 	processedTransactionMutex = sync.RWMutex{}
-
+	processedTransactionSet = make(map[TransID]struct{})
 	blockMap = make(map[BlockID]*BlockInfo)
 	rootBlockID = [sha256.Size]byte{}
 	rootBlockInfo := new(BlockInfo)
