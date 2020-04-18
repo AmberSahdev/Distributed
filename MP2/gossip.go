@@ -95,7 +95,7 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			processedTransactionMutex.RLock()
 			for _, curTransaction := range m.BatchTransactions {
 				if _, alreadyProcessed := processedTransactionSet[curTransaction.TransactionID]; !alreadyProcessed {
-					addTransaction(curTransaction)
+					addTransaction(curTransaction, false)
 				}
 			}
 			processedTransactionMutex.RUnlock()
@@ -193,10 +193,9 @@ func (node *nodeComm) handleNodeComm(tcpDec *gob.Decoder) {
 			transactionMutex.RLock()
 			processedTransactionMutex.RLock()
 			for _, transactionID := range m.TransactionsPendingTransmission {
-				if _, alreadyProcessed := processedTransactionSet[transactionID]; !alreadyProcessed {
-					if _, exists := transactionMap[transactionID]; !exists {
-						transactionsNeeded = append(transactionsNeeded, transactionID)
-					}
+				_, alreadyProcessed := processedTransactionSet[transactionID]
+				if _, exists := transactionMap[transactionID]; !exists && !alreadyProcessed {
+					transactionsNeeded = append(transactionsNeeded, transactionID)
 				}
 			}
 			processedTransactionMutex.RUnlock()

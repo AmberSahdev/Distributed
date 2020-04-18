@@ -223,7 +223,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 				copy(transactionID[:], transactionIDSlice[:TranSize])
 				*transaction = TransactionMessage{transactionTime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
 				transactionMutex.Lock()
-				addTransaction(*transaction) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+				addTransaction(*transaction, false) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
 				transactionMutex.Unlock()
 			} else if msgType == "VERIFY" {
 				if mp2ServiceMsgArr[1] == "OK" {

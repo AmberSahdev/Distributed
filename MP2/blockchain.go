@@ -21,14 +21,34 @@ func blockchain() {
 			curLongestChainLeafMutex.Unlock()
 			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]), "current height: ", curLongestChainLeaf.BlockHeight)
 			processedTransactionMutex.Lock()
-			addTransactionsToProcessedSet(newValidBlock)
+			addTransactionsToProcessedSet(newValidBlock.Transactions)
 			processedTransactionMutex.Unlock()
 			transactionMutex.Lock()
-			deleteDuplicateTransactions(newValidBlock)
+			deleteDuplicateTransactions(newValidBlock.Transactions)
 			transactionMutex.Unlock()
 			go startNewMine(curLongestChainLeaf)
 		} else if newValidBlock.BlockHeight > curLongestChainLeaf.BlockHeight { //new Longest chain!
-			panic("Longest Chain Overtaken! Sepuku")
+			// TODO: Find the fork's common ancestor!
+			// remove rolled-back processed Transaction from set
+			// add rolled forward transactions to set
+			blockMutex.RLock()
+			commonAncestorBlock := getForkBlock(newValidBlock, curLongestChainLeaf)
+			transactionsToRollback := getTransactionsInSegment(curLongestChainLeaf, commonAncestorBlock) // Not including commonAncestorBlock
+			transactionsToCommit := getTransactionsInSegment(newValidBlock, commonAncestorBlock)
+			blockMutex.RUnlock()
+			processedTransactionMutex.Lock()
+			removeTransactionsFromProcessedSet(transactionsToRollback)
+			addTransactionsToProcessedSet(transactionsToCommit)
+			processedTransactionMutex.Unlock()
+			transactionMutex.Lock()
+			addRolledBackTransactions(transactionsToRollback)
+			deleteDuplicateTransactions(transactionsToCommit)
+			transactionMutex.Unlock()
+			curLongestChainLeafMutex.Lock()
+			curLongestChainLeaf = newValidBlock
+			curLongestChainLeafMutex.Unlock()
+			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]))
+
 		}
 	}
 }
@@ -102,8 +122,14 @@ func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []Trans
 	return newAccountBalances, newTransactionList
 }
 
-func addTransactionsToProcessedSet(newBlock *Block) {
-	for _, transMsg := range newBlock.Transactions {
+func removeTransactionsFromProcessedSet(oldTransactions []TransactionMessage) {
+	for _, transMsg := range oldTransactions {
+		delete(processedTransactionSet, transMsg.TransactionID)
+	}
+}
+
+func addTransactionsToProcessedSet(newTransactions []TransactionMessage) {
+	for _, transMsg := range newTransactions {
 		processedTransactionSet[transMsg.TransactionID] = empty
 	}
 }
@@ -207,9 +233,16 @@ func askVerifyBlock(b *Block) {
 	Info.Println(serviceMsg)
 }
 
-func deleteDuplicateTransactions(b *Block) {
+func addRolledBackTransactions(Transactions []TransactionMessage) {
+	for _, transaction := range Transactions {
+		// remove from transactionMap
+		addTransaction(transaction, true)
+	}
+}
+
+func deleteDuplicateTransactions(Transactions []TransactionMessage) {
 	// remove from transactionList
-	for _, transaction := range b.Transactions {
+	for _, transaction := range Transactions {
 		// remove from transactionMap
 		ind, exists := transactionMap[transaction.TransactionID]
 		if exists {
@@ -271,7 +304,7 @@ func getParentBlock(b *Block) *Block {
 	return blockList[parent.Index]
 }
 
-func getTransacationInSegment(leaf *Block, fork *Block) []TransactionMessage {
+func getTransactionsInSegment(leaf *Block, fork *Block) []TransactionMessage {
 	segmentTransactions := make([]TransactionMessage, 0)
 	b := leaf
 	for b.BlockID != fork.BlockID {

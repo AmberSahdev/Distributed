@@ -47,13 +47,15 @@ func connectToNode(node *nodeComm) error {
 	return nil
 }
 
-func addTransaction(m TransactionMessage) {
+func addTransaction(m TransactionMessage, isInternal bool) {
 	newM := new(TransactionMessage)
 	*newM = m
 	if _, exists := transactionMap[m.TransactionID]; !exists {
 		transactionMap[m.TransactionID] = len(transactionList)
 		transactionList = append(transactionList, newM)
-		logTransaction(m)
+		if !isInternal {
+			logTransaction(m)
+		}
 	} else {
 		Warning.Println("Got Transaction", m.TransactionID, "but already added to local set")
 	}
