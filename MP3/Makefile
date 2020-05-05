@@ -1,7 +1,16 @@
 all:
 	@echo "building all"
-	go build main.go utils.go
+	make branch
+	make client
+
+branch:
+	@echo "building branch"
+	go build -o branch ./src/branch/main.go ./src/branch/utils.go
+
+client:
+	@echo "building client"
+	go build -o client ./src/client/main.go ./src/client/utils.go
 
 clean:
 	@echo "deleting binaries"
-	rm main
+	rm client branch
