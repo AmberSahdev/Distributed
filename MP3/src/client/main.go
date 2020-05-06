@@ -22,13 +22,25 @@ func main() {
 	go pipeKeyboardToInbox()
 	// Communicate with User and Branches/Servers
 	var input Message
+	hasBegun := false
+	waitingForBranchResponse := false
+	waitingForBranchName := ""
+
 	for input = range inbox {
-		if input.val == "BEGIN" && input.src == "k" {
-			for input = range inbox {
-				if input.val == "ABORT" && input.src == "k" {
-					sendToAll("ABORT")
-					break
-				} else if input.val == "COMMIT" && input.src == "k" {
+		if input.src == "k" { // Message from keyboard
+			if !hasBegun && input.val == "BEGIN" {
+				hasBegun = true
+
+			} else if hasBegun && input.val == "ABORT" {
+				sendToAll("ABORT")
+				fmt.Println("ABORTED")
+				hasBegun = false
+				waitingForBranchResponse = false
+				waitingForBranchName = ""
+
+			} else if hasBegun && !waitingForBranchResponse {
+				switch input.val {
+				case "COMMIT":
 					sendToAll("CHECK")
 					if all_say_COMMIT_OK() {
 						sendToAll("COMMIT")
@@ -37,33 +49,38 @@ func main() {
 						sendToAll("ABORT")
 						fmt.Println("ABORTED") // waitForAborted()
 					}
-					break
-				} else if input.src == "k" {
+					hasBegun = false
+
+				default:
 					targetBranchName := findInputTarget(input.val)
 					outbox <- Message{targetBranchName, input.val}
-					for input = range inbox {
-						if input.val == "ABORT" && input.src == "k" {
-							sendToAll("ABORT")
-							fmt.Println("ABORTED") // waitForAborted()
-							break
-						} else if input.src == targetBranchName {
-							fmt.Println(input.val)
-							if input.val == "NOT FOUND" {
-								sendToAll("ABORT")
-								fmt.Println("ABORTED") // waitForAborted()
-							}
-							break
-						} else {
-							Error.Println("Error\t input:", input)
-							panic("Received message over tcp from unexpected source")
-						}
-					}
-				} else {
-					panic("Unforeseen Control Flow")
+					waitingForBranchResponse = true
+					waitingForBranchName = targetBranchName
 				}
+			} else {
+				Info.Println("Discarded input (1):", input)
 			}
+
+		} else if input.src != "k" { // Message over TCP
+			fmt.Println(input.val)
+
+			// DEBUG
+			if waitingForBranchResponse && input.src != waitingForBranchName {
+				Error.Println("Error\t input:", input)
+				panic("Received message over tcp from unexpected source")
+			}
+
+			if input.val == "NOT FOUND" {
+				sendToAll("ABORT")
+				fmt.Println("ABORTED") // waitForAborted()
+				hasBegun = false
+			}
+
+			waitingForBranchResponse = false
+			waitingForBranchName = ""
+
 		} else {
-			Info.Println("Discarded input:", input)
+			Info.Println("Discarded input (2):", input)
 		}
 	}
 }
