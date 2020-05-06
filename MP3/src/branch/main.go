@@ -38,15 +38,20 @@ func main() {
 }
 
 func (curNode *clientNode) receiveIncomingMessages() {
-	var buf [1024]byte
+	var buf [65536]byte
 	for {
-		len, err := curNode.conn.Read(buf[:])
+		msglen, err := curNode.conn.Read(buf[:])
 		if err != nil {
 			Error.Println("Failed to read message from Client!")
 			break
 		}
-		msg := string(buf[:len])
-		curNode.inbox <- msg
+		msgPkt := string(buf[:msglen])
+		msgArr := strings.Split(msgPkt, "\n")
+		for _, msg := range msgArr {
+			if len(msg) > 0 {
+				curNode.inbox <- msg
+			}
+		}
 	}
 	Error.Println("No longer receiving from client!")
 	close(curNode.inbox)
@@ -56,9 +61,9 @@ func (curNode *clientNode) receiveIncomingMessages() {
 
 func (curNode *clientNode) sendOutgoingMessages() {
 	for msg := range curNode.outbox {
-		_, err := curNode.conn.Write([]byte(msg))
+		_, err := curNode.conn.Write([]byte(msg + "\n"))
 		if err != nil {
-			_, err := curNode.conn.Write([]byte(msg))
+			_, err := curNode.conn.Write([]byte(msg + "\n"))
 			if err != nil {
 				Error.Println("Failed to send message:", msg)
 			}
