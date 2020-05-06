@@ -63,9 +63,10 @@ func (curNode *clientNode) sendOutgoingMessages() {
 	for msg := range curNode.outbox {
 		_, err := curNode.conn.Write([]byte(msg + "\n"))
 		if err != nil {
+			Warning.Println("Failed to send message, retrying:", msg)
 			_, err := curNode.conn.Write([]byte(msg + "\n"))
 			if err != nil {
-				Error.Println("Failed to send message:", msg)
+				Error.Println("Failed to send message after retry:", msg)
 			}
 		}
 	}
