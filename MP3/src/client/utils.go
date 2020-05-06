@@ -124,8 +124,10 @@ func handleOutgoingMessages() {
 	for m := range outbox {
 		Info.Println("adding to outbox:", m)
 		_, err := branches[m.src].Write([]byte(m.val + "\n"))
+		Debug.Println("Sent Message:", m.val, "to branch:", m.src)
 		check(err)
 	}
+	panic("Outbox has closed!")
 }
 
 func initLogging() {

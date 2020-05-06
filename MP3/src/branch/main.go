@@ -42,6 +42,7 @@ func (curNode *clientNode) receiveIncomingMessages() {
 			break
 		}
 		msgPkt := string(buf[:msglen])
+		Debug.Println("Received Message:", msgPkt)
 		msgArr := strings.Split(msgPkt, "\n")
 		for _, msg := range msgArr {
 			if len(msg) > 0 {
@@ -65,6 +66,7 @@ func (curNode *clientNode) sendOutgoingMessages() {
 				Error.Println("Failed to send message after retry:", msg)
 			}
 		}
+		Debug.Println("Sent Message:", msg)
 	}
 	Error.Println("No Longer sending Messages to client!")
 	return
@@ -81,6 +83,7 @@ func handleClientComm(conn net.Conn) {
 		incomingMsgArr := strings.Split(incomingMsg, " ")
 		switch incomingMsgArr[0] {
 		case "DEPOSIT":
+			Debug.Println("Got a Deposit for", incomingMsgArr[1], "of", incomingMsgArr[2])
 			accNameArr := strings.Split(incomingMsgArr[1], ".")
 			accName := accNameArr[1]
 			change, err := strconv.Atoi(incomingMsgArr[2])
@@ -102,6 +105,7 @@ func handleClientComm(conn net.Conn) {
 			isWriteLockedAccount[accName] = true
 			balanceChanges[accName] += change
 			curAccount.Balance += change
+			curNode.outbox <- "OK"
 		case "WITHDRAW":
 			accNameArr := strings.Split(incomingMsgArr[1], ".")
 			accName := accNameArr[1]
@@ -125,6 +129,7 @@ func handleClientComm(conn net.Conn) {
 			isWriteLockedAccount[accName] = true
 			balanceChanges[accName] -= change
 			curAccount.Balance -= change
+			curNode.outbox <- "OK"
 		case "BALANCE":
 			// Get Read Lock on account
 			accNameArr := strings.Split(incomingMsgArr[1], ".")

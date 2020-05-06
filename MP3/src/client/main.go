@@ -41,7 +41,6 @@ func main() {
 				} else if input.src == "k" {
 					targetBranchName := findInputTarget(input.val)
 					outbox <- Message{targetBranchName, input.val}
-
 					for input = range inbox {
 						if input.val == "ABORT" && input.src == "k" {
 							sendToAll("ABORT")
