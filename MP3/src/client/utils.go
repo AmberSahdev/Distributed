@@ -41,8 +41,8 @@ func findInputTarget(input string) string {
 	// parse target branch A, or B, or C ... from input
 	split := strings.SplitN(input, " ", 2)
 	target := strings.SplitN(split[1], ".", 2)
-	Info.Println("input was:", input)
-	Info.Println("extracted target:", target[0])
+	//Info.Println("input was:", input)
+	//Info.Println("extracted target:", target[0])
 	return target[0]
 }
 
@@ -56,6 +56,7 @@ func pipeConnToInbox(branchName string) {
 		msgArr := strings.Split(str, "\n")
 		for _, msg := range msgArr {
 			m := Message{branchName, msg}
+			Info.Println("Adding to inbox:", m)
 			inbox <- m
 		}
 	}
@@ -64,8 +65,9 @@ func pipeConnToInbox(branchName string) {
 func pipeKeyboardToInbox() {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		msg := Message{"k", scanner.Text()}
-		inbox <- msg
+		m := Message{"k", scanner.Text()}
+		Info.Println("Adding to inbox:", m)
+		inbox <- m
 	}
 }
 
@@ -120,6 +122,7 @@ func all_say_COMMIT_OK() bool {
 
 func handleOutgoingMessages() {
 	for m := range outbox {
+		Info.Println("adding to outbox:", m)
 		_, err := branches[m.src].Write([]byte(m.val + "\n"))
 		check(err)
 	}
