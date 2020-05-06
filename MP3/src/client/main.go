@@ -46,6 +46,11 @@ func main() {
 							break
 						} else if input.src == "t" {
 							fmt.Println(input.val)
+							// TODO check if need to abort on some input
+							if input.val == "NOT FOUND" {
+								sendToAll("ABORT")
+								waitForAborted()
+							}
 							break
 						}
 					}
