@@ -60,7 +60,7 @@ func pipeConnToInbox(branchName string) {
 				m.src = branchName
 				m.val = msg
 				Info.Println("Adding to inbox:", m)
-				inbox <- m
+				inbox <- *m
 			}
 		}
 	}
