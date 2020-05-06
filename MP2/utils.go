@@ -78,7 +78,7 @@ func addBlock(m Block, isLocal bool) {
 		} else {
 			go verifyBlock(newM)
 		}
-
+		logBlockMetadata(newM)
 		logBandwidthBlock(newM)
 	} else {
 		Warning.Println("Got Block", m.BlockID, "but already added to local set")

@@ -11,9 +11,10 @@ import (
 
 var fTransactions *os.File
 var fBandwidth *os.File
+var fBlock *os.File
 
 func logging() {
-	fTransactions, fBandwidth = create_logging_files()
+	fTransactions, fBandwidth, fBlock = create_logging_files()
 
 	// Adds a new line to our bandwidth file after every resolution seconds
 	resolution := 1.0
@@ -69,12 +70,31 @@ func logBandwidthBlock(b *Block) {
 	fBandwidth.WriteString(strconv.Itoa(numBytes) + " ")
 }
 
-func create_logging_files() (*os.File, *os.File) {
+func create_logging_files() (*os.File, *os.File, *os.File) {
 	// fTransactions: format: timeLogged transactionID trasactionID'sTimestamp
 	fTransactions, err := os.Create("eval_logs/transactions_" + localNodeName + ".txt")
 	check(err)
 	// fBandwidth: add a new line every second, each line has a bunch of numbers corresponding to num of bytes written
 	fBandwidth, err := os.Create("eval_logs/bandwidth_" + localNodeName + ".txt")
 	check(err)
-	return fTransactions, fBandwidth
+	// fBlock: add new line after every <time received> <block id>
+	fBlock, err := os.Create("eval_logs/blockMetadata_" + localNodeName + ".txt")
+	check(err)
+	return fTransactions, fBandwidth, fBlock
 }
+
+func logBlockMetadata(b *Block) {
+	now := time.Now()
+	loggingTime := fmt.Sprintf("%v", float64(now.UnixNano())/1e9)
+	bID := fmt.Sprintf("%x", b.BlockID)
+	numTransactions := fmt.Sprintf("%d", len(b.Transactions))
+	fBlock.WriteString(loggingTime + " " + bID + " " + numTransactions + "\n")
+}
+
+/*
+1. number of transactions in a block
+2. block reachability
+3. block propogation delay
+
+need: <time received> <block id>
+*/

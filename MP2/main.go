@@ -21,10 +21,10 @@ var (
 	Error   *log.Logger
 )
 
-const MinimiumTransactionsInBlock = 20
+const MinimiumTransactionsInBlock = 2
 const MaxTransactionsInBlock = 2000
-const GOSSIPPOLLINGPERIOD = 1000 // Global Gossip Pull Request sent to a node every PollingPeriod ms
-const CONNPOLLINGPERIOD = 250    // polling period for connecting to new nodes.
+const GOSSIPPOLLINGPERIOD = 100 // Global Gossip Pull Request sent to a node every PollingPeriod ms
+const CONNPOLLINGPERIOD = 250   // polling period for connecting to new nodes.
 
 const TranSize = 16      // transactionID Size in bytes (128 bit IDs)
 var localNodeName string // tracks local node's name
@@ -71,7 +71,7 @@ func main() {
 		return
 	}
 	localNodeName = arguments[1]
-	localIPaddr = GetOutboundIP()
+	localIPaddr = "localhost" // GetOutboundIP()
 	Info.Println("Found local IP to be " + localIPaddr)
 	localPort = arguments[2]
 	numConns = 0

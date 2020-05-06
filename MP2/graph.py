@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
-numNodes = 20
-case = 1
+numNodes = 100
+case = 2
 baseDir = "eval_logs/"
 
 def bandwidth_graph():
@@ -158,6 +158,157 @@ def propagation_delay_graph():
 
     return
 
+def block_reachability_graph():
+    nodeNums = np.arange(numNodes) + 1
+
+    blockReach = dict() # format transactionID:number of files seen in
+    blockTime = dict()
+
+    for nodeNum in nodeNums:
+        window = 1 # 1 seconds
+        with open(baseDir + "blockMetadata_node" + str(nodeNum) + ".txt") as file:
+            for line in file:
+                line = line[:-1] # stripping the "\n"
+                line = line.strip()
+                blockLoggingTime = line.split(" ")[0]
+                blockID = line.split(" ")[1]
+                numTransactionsInBlock = line.split(" ")[2]
+                if blockID not in blockReach.keys():
+                    blockReach[blockID] = 0
+                    blockTime[blockID] = blockLoggingTime
+                blockReach[blockID] += 1
+
+    # sort by transaction time
+    xSorted = sorted(blockTime.items(), key=lambda x: x[1])
+    y = []
+    for x in xSorted:
+        key = x[0]
+        y.append(blockReach[key])
+    x = np.arange(len(y))
+    xticks = [item[0] for item in xSorted]
+
+    #"""
+    # Bar Graph
+    plt.bar(x, y, label='Block Reachability') #, 'm.:', )
+    #plt.xticks(x, xticks)
+    plt.ylabel('Number of Nodes reached')
+    plt.xlabel('Block Number')
+    plt.title('Reachability Graph Case' + str(case))
+    plt.grid()
+    #plt.show()
+    plt.savefig(fname = baseDir + 'blockReachability_case' + str(case) + '.png', dpi=500)
+    plt.close()
+    return
+
+def block_size_graph():
+    nodeNums = np.arange(numNodes) + 1
+
+    blockReach = dict() # format transactionID:number of transactions
+    blockTime = dict()
+
+    for nodeNum in nodeNums:
+        with open(baseDir + "blockMetadata_node" + str(nodeNum) + ".txt") as file:
+            for line in file:
+                line = line[:-1] # stripping the "\n"
+                line = line.strip()
+                blockLoggingTime = line.split(" ")[0]
+                blockID = line.split(" ")[1]
+                numTransactionsInBlock = int(line.split(" ")[2])
+                if blockID not in blockReach.keys():
+                    blockReach[blockID] = numTransactionsInBlock
+                    blockTime[blockID] = blockLoggingTime
+                # blockReach[blockID] += 1
+
+    # sort by transaction time
+    xSorted = sorted(blockTime.items(), key=lambda x: x[1])
+    y = []
+    for x in xSorted:
+        key = x[0]
+        y.append(blockReach[key])
+    x = np.arange(len(y))
+    xticks = [item[0] for item in xSorted]
+
+    #"""
+    # Bar Graph
+    plt.bar(x, y, label='Number of transactions in Block') #, 'm.:', )
+    # plt.yscale('linear')
+    # plt.xticks(x, xticks)
+    plt.ylabel('Number of Transactions in Block')
+    plt.xlabel('Block Number')
+    plt.title('Number of transactions in Block Case' + str(case))
+    plt.grid()
+    #plt.show()
+    plt.savefig(fname = baseDir + 'blockSize_case' + str(case) + '.png', dpi=500)
+    plt.close()
+    return
+
+def block_propagation_delay_graph():
+    blockReach = dict() # format transactionID:[time transaction reached a node]
+    blockTime = dict() # format transactionID:transactionTime
+
+    nodeNums = np.arange(numNodes) + 1
+    for nodeNum in nodeNums:
+        with open(baseDir + "blockMetadata_node" + str(nodeNum) + ".txt") as file:
+            for line in file:
+                line = line[:-1] # stripping the "\n"
+                line = line.strip()
+                blockLoggingTime, blockID, numTransactionsInBlock = line.split(" ")
+                blockLoggingTime=np.float64(blockLoggingTime)
+                numTransactionsInBlock=int(numTransactionsInBlock)
+
+                if blockID not in blockReach.keys():
+                    #transactionReach[currID] = []
+                    blockReach[blockID] = [blockLoggingTime] #np.array([loggingTime])
+                    # blockTime[blockID] = blockLoggingTime
+                else:
+                    blockReach[blockID].append(blockLoggingTime)
+                    #np.append(transactionReach[currID], [loggingTime])
+
+    for key in blockReach.keys():
+        miningTime = min(blockReach[key])
+        blockTime[key] = miningTime
+        for i in range(len(blockReach[key])):
+            blockReach[key][i] = blockReach[key][i] - blockTime[key]
+
+    # sort by transaction time
+    minList = [] # min propagation delay
+    maxList = []
+    medianList = []
+
+    sortedKeys = sorted(blockTime.items(), key=lambda x: x[1])
+
+    for item in sortedKeys:
+        key = item[0]
+        data = np.array(blockReach[key])
+        if len(data) > 1:
+            sortedData = np.sort(data)
+            minList.append(sortedData[1])
+        else:
+            minList.append(data[0])
+        maxList.append(np.max(data))
+        medianList.append(np.median(data))
+
+    x = np.arange(len(sortedKeys))
+    xticks = [item[0] for item in sortedKeys]
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax1.plot(x, minList, 'C1x-', label='minimum delay')
+    ax1.plot(x, maxList, 'C3x-', label='maximum')
+    ax1.plot(x, medianList, 'C2.-', label='median')
+    plt.legend(loc='upper right');
+    ax1.set_ylabel('Delay in Seconds')
+    ax1.set_xlabel('Block Number')
+    ax1.set_title('Block Propagation Delay Graph Case' + str(case))
+    plt.savefig(fname = baseDir + 'block_propagation_delay_case' + str(case) + '.png', dpi=200)
+    plt.close()
+
+    return
+
+
 propagation_delay_graph()
 reachability_graph()
 bandwidth_graph()
+block_reachability_graph()
+block_size_graph()
+block_propagation_delay_graph()

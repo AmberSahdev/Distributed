@@ -27,7 +27,9 @@ func blockchain() {
 			deleteDuplicateTransactions(newValidBlock.Transactions)
 			transactionMutex.Unlock()
 			go startNewMine(curLongestChainLeaf)
-		} else if newValidBlock.BlockHeight > curLongestChainLeaf.BlockHeight { //new Longest chain!
+			Info.Println("Balances:", curLongestChainLeaf.AccountBalances)
+		} else if newValidBlock.BlockHeight > curLongestChainLeaf.BlockHeight || (newValidBlock.BlockHeight == curLongestChainLeaf.BlockHeight && newValidBlock.BlockHeight < curLongestChainLeaf.BlockHeight) { //new Longest chain!
+			Error.Println("Chain Splitting Detected!")
 			blockMutex.RLock()
 			commonAncestorBlock := getForkBlock(newValidBlock, curLongestChainLeaf)
 			transactionsToRollback := getTransactionsInSegment(curLongestChainLeaf, commonAncestorBlock) // Not including commonAncestorBlock
@@ -45,6 +47,8 @@ func blockchain() {
 			curLongestChainLeaf = newValidBlock
 			curLongestChainLeafMutex.Unlock()
 			Info.Println("New Longest Chain Leaf received w/ ID:", hex.EncodeToString(curLongestChainLeaf.BlockID[:]), "current height:", curLongestChainLeaf.BlockHeight)
+			Info.Println("Balances:", curLongestChainLeaf.AccountBalances)
+			go startNewMine(curLongestChainLeaf)
 		}
 	}
 }

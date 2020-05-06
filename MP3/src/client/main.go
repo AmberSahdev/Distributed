@@ -27,7 +27,6 @@ func main() {
 			for input = range inbox {
 				if input.val == "ABORT" && input.src == "k" {
 					sendToAll("ABORT")
-					waitForAborted()
 					break
 				} else if input.val == "COMMIT" && input.src == "k" {
 					sendToAll("CHECK")
