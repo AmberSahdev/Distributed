@@ -74,8 +74,9 @@ type BlockInfo struct {
 
 /********************************* Blockchain *********************************/
 type Block struct {
-	ParentBlockID   BlockID              // [sha256.Size]byte    // Previous block's proof of work/blockID
-	Transactions    []TransactionMessage // TODO: you do not need the timestamp in block, make a new struct altogether, or just discard timestamp when you receive it from mp2Service
+	ParentBlockID BlockID              // [sha256.Size]byte    // Previous block's proof of work/blockID
+	Transactions  []TransactionMessage /* Potential Optimization, you do not need the timestamp in block,
+	make a new struct altogether, or just discard timestamp when you receive it from mp2Service */
 	AccountBalances map[AccountID]uint64 // a state of ledger at this point
 	BlockHeight     uint64               // This block's height in its branch
 	BlockID         BlockID              // [sha256.Size]byte

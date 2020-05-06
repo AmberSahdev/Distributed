@@ -37,7 +37,7 @@ var localPort string
 
 var mp2Service nodeComm
 
-var transactionList []*TransactionMessage // List of TransactionMessage // TODO: have a locking mechanism for this bc both handle_service_comms and node.handle_node_comm accessing it
+var transactionList []*TransactionMessage // List of TransactionMessage
 var transactionMap map[TransID]int
 var processedTransactionSet map[TransID]struct{}
 var processedTransactionMutex sync.RWMutex
@@ -128,7 +128,6 @@ func main() {
 
 	go configureGossipProtocol()
 
-	// go debugPrintTransactions() // TODO: remove later
 	go logging()
 
 	go blockchain()
@@ -205,7 +204,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 		case string:
 			mp2ServiceMsgArr := strings.Split(mp2ServiceMsg, " ")
 			msgType := mp2ServiceMsgArr[0]
-			// TODO: replace this with a case statement
+			// Potential Optimization: replace this with a switch statement
 			if msgType == "TRANSACTION" {
 				// Example: TRANSACTION 1551208414.204385 f78480653bf33e3fd700ee8fae89d53064c8dfa6 183 99 10
 				//fmt.Println("received mp2_service transaction")
@@ -224,7 +223,7 @@ func handleServiceComms(mp2ServiceAddr string) {
 				copy(transactionID[:], transactionIDSlice[:TranSize])
 				*transaction = TransactionMessage{transactionTime, transactionID, AccountID(transactionSrc), AccountID(transactionDest), uint64(transactionAmt)}
 				transactionMutex.Lock()
-				addTransaction(*transaction, false) // transactionList = append(transactionList, transaction) // TODO: make this more efficient
+				addTransaction(*transaction, false)
 				transactionMutex.Unlock()
 			} else if msgType == "VERIFY" {
 				if mp2ServiceMsgArr[1] == "OK" {
@@ -282,7 +281,6 @@ func handleServiceComms(mp2ServiceAddr string) {
 				neighborMutex.Unlock()
 				go node.handleNodeComm(nil)
 			} else if (msgType == "QUIT") || (msgType == "DIE") {
-				// TODO: impelment a better quit or die handler
 				Error.Println("QUIT or DIE received")
 				panic(mp2ServiceMsg)
 			}
