@@ -149,8 +149,7 @@ func handleClientComm(conn net.Conn) {
 			// return account balance
 			curNode.outbox <- incomingMsgArr[1] + " = " + string(curAccount.Balance)
 		case "ABORT":
-			// TODO: release all acquired locks
-			// only need read lock on map itself
+			// Abort current transaction
 			localAccountsMutex.RLock()
 			for accName, balanceChange := range balanceChanges {
 				localAccounts[accName].Balance -= balanceChange
@@ -176,12 +175,12 @@ func handleClientComm(conn net.Conn) {
 					break
 				}
 			}
+			localAccountsMutex.Unlock()
 			if hasBadAccountBalance {
 				curNode.outbox <- "ABORTED"
 			} else {
 				curNode.outbox <- "COMMIT OK"
 			}
-			localAccountsMutex.Unlock()
 			// TODO: ensure account balances are positive
 		case "COMMIT":
 			// TODO: release all acquired locks and reset maps
@@ -200,6 +199,23 @@ func handleClientComm(conn net.Conn) {
 			Error.Println("Unknown value sent by client:", incomingMsg)
 		}
 	}
+	// Abort current transaction
+	localAccountsMutex.RLock()
+	for accName, balanceChange := range balanceChanges {
+		localAccounts[accName].Balance -= balanceChange
+	}
+	localAccountsMutex.RUnlock()
+	balanceChanges = make(map[string]int)
+	localAccountsMutex.RLock()
+	for accName, canWrite := range isWriteLockedAccount {
+		if canWrite {
+			localAccounts[accName].Lock.Unlock()
+		} else {
+			localAccounts[accName].Lock.RUnlock()
+		}
+	}
+	localAccountsMutex.RUnlock()
+	isWriteLockedAccount = make(map[string]bool)
 	close(curNode.outbox)
 	return
 }

@@ -55,9 +55,11 @@ func pipeConnToInbox(branchName string) {
 		str := string(buf[:inputLen])
 		msgArr := strings.Split(str, "\n")
 		for _, msg := range msgArr {
-			m := Message{branchName, msg}
-			Info.Println("Adding to inbox:", m)
-			inbox <- m
+			if len(msg) > 0 {
+				m := new(Message{branchName, msg})
+				Info.Println("Adding to inbox:", m)
+				inbox <- m
+			}
 		}
 	}
 }
