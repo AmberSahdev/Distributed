@@ -147,7 +147,7 @@ func handleClientComm(conn net.Conn) {
 				isWriteLockedAccount[accName] = false
 			}
 			// return account balance
-			curNode.outbox <- incomingMsgArr[1] + " = " + string(curAccount.Balance)
+			curNode.outbox <- incomingMsgArr[1] + " = " + strconv.Itoa(curAccount.Balance)
 		case "ABORT":
 			// Abort current transaction
 			localAccountsMutex.RLock()
