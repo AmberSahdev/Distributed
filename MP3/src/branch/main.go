@@ -78,7 +78,7 @@ func handleClientComm(conn net.Conn) {
 	isWriteLockedAccount := make(map[string]bool) // if a lock is in the map it is at least a read lock. if true, write lock
 	balanceChanges := make(map[string]int)        // tracks net changes in account balances during transactions!
 	for incomingMsg := range curNode.inbox {
-		// TODO: Parse message, acquire locks, apply update, Rollback!
+		// Parse message, acquire locks, apply update, & handle Rollback
 		incomingMsgArr := strings.Split(incomingMsg, " ")
 		switch incomingMsgArr[0] {
 		case "DEPOSIT":
@@ -127,8 +127,7 @@ func handleClientComm(conn net.Conn) {
 			balanceChanges[accName] -= change
 			curAccount.Balance -= change
 		case "BALANCE":
-			// TODO: Get Read Lock on account
-			// TODO: return account balance
+			// Get Read Lock on account
 			accNameArr := strings.Split(incomingMsgArr[1], ".")
 			accName := accNameArr[1]
 			localAccountsMutex.Lock()
@@ -143,6 +142,7 @@ func handleClientComm(conn net.Conn) {
 				curAccount.Lock.RLock()
 				isWriteLockedAccount[accName] = false
 			}
+			// return account balance
 			curNode.outbox <- incomingMsgArr[1] + " = " + string(curAccount.Balance)
 		case "ABORT":
 			// TODO: release all acquired locks
