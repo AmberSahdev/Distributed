@@ -5,13 +5,11 @@ import "net"
 type nodeComms struct {
 	senderMessageNum int64    //
 	address          string   // outgoing node's address:port string
-	conn             net.Conn // TODO find out if pass by value or pointer is better here
+	conn             net.Conn // TODO: find out if pass by value or pointer is better here
 	outbox           chan BankMessage
 	isDead           []bool
 	isConnected      bool
 }
-
-// Todo define an actual encode & decode method for this and settle on a/many concrete
 
 // types for the decoded result
 type Message interface{}
