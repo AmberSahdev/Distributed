@@ -9,7 +9,7 @@ branch:
 
 client:
 	@echo "building client"
-	go build -o client ./src/client/main.go ./src/client/utils.go
+	go build -o client ./src/client/main.go ./src/client/utils.go ./src/client/myTypes.go
 
 launcher:
 	@echo "building launcher"

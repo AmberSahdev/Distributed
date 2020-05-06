@@ -1,63 +1,60 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"net"
-	"os"
 )
 
 var branches map[string]net.Conn
+var inbox chan Message
 
 func main() {
-	fmt.Println("I'm a Client")
 	branches = make(map[string]net.Conn)
+	inbox = make(chan Message, 65536)
 
 	connectToBranches()
+	go pipeKeyboardToInbox()
 
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		input := scanner.Text()
-
-		if input == "BEGIN" {
-			// NOTE: ???
-			for scanner.Scan() {
-				input = scanner.Text()
-
-				if input == "ABORT" {
-					// TODO: send all branches abort
+	var input Message
+	for input = range inbox {
+		if input.val == "BEGIN" && input.src == "k" {
+			for input = range inbox {
+				if input.val == "ABORT" && input.src == "k" {
+					sendToAll("ABORT")
+					waitForAborted()
 					break
-				} else if input == "COMMIT" {
-					// TODO: send all branches commit
+				} else if input.val == "COMMIT" && input.src == "k" {
+					// 2 stage commit
+					sendToAll("COMMIT")
+					if all_say_COMMIT_OK() {
+						fmt.Println("COMMIT OK")
+					} else {
+						sendToAll("ROLLBACK")
+						fmt.Println("ABORTED")
+					}
+
 					break
-				} else {
-					targetBranchName := findInputTarget(input)
-					_, err := branches[targetBranchName].Write([]byte(input))
+				} else if input.src == "k" {
+					targetBranchName := findInputTarget(input.val)
+					_, err := branches[targetBranchName].Write([]byte(input.val))
 					check(err)
 
-					for {
-						// if received an OK, exit loop. (wait for lock + tcp reply)
-						// else see if user typed in "Abort"
+					for input = range inbox {
+						if input.val == "ABORT" && input.src == "k" {
+							sendToAll("ABORT")
+							waitForAborted()
+							break
+						} else if input.src == "t" {
+							fmt.Println(input.val)
+							break
+						}
 					}
+				} else {
+					panic("Unforeseen Control Flow")
 				}
-
 			}
 		} else {
-			// Discard Input
-			// TODO: logging
-			//
+			fmt.Println("Discarded input:", input)
 		}
 	}
-
-	/*
-		1. accept user input of BEGIN, DEPOSIT, BALANCE, WITHDRAW, COMMIT, ABORT
-		2. wait for relevant branch to reply "OK", a balance, "NOT FOUND", "ABORTED", "COMMIT OK"
-			- if branch replies
-		3. repeat
-	*/
-}
-
-for input <- inbox {
-	"ABORT"
-	"ABORTED"
 }
