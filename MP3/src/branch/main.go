@@ -16,6 +16,8 @@ var (
 )
 var branchName string
 var localPort string
+var localAccounts map[string]Account
+var clientCounter int
 
 func main() {
 	fmt.Println("I'm a Branch")
@@ -62,6 +64,9 @@ func (curNode *clientNode) sendOutgoingMessages() {
 }
 
 func handleClientComm(conn net.Conn) {
+	clientCounter += 1
+	var curClientID ClientID
+	curClientID = clientCounter
 	curNode := clientNode{conn, make(chan string, 1024), make(chan string, 1024)}
 	go curNode.receiveIncomingMessages()
 	go curNode.sendOutgoingMessages()
