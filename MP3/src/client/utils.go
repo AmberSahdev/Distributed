@@ -41,6 +41,8 @@ func findInputTarget(input string) string {
 	// parse target branch A, or B, or C ... from input
 	split := strings.SplitN(input, " ", 2)
 	target := strings.SplitN(split[1], ".", 2)
+	Info.Println("input was:", input)
+	Info.Println("extracted target:", target[0])
 	return target[0]
 }
 

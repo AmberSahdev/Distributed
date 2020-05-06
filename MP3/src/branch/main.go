@@ -192,7 +192,7 @@ func handleClientComm(conn net.Conn) {
 			localAccountsMutex.RUnlock()
 			isWriteLockedAccount = make(map[string]bool)
 		default:
-			Error.Println("Unknown value sent by client!")
+			Error.Println("Unknown value sent by client:", incomingMsg)
 		}
 	}
 	close(curNode.outbox)
