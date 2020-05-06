@@ -17,4 +17,4 @@ launcher:
 
 clean:
 	@echo "deleting binaries"
-	rm client branch
+	rm client branch launcher

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -22,11 +21,11 @@ var localAccounts map[string]*Account
 var localAccountsMutex sync.RWMutex
 
 func main() {
-	fmt.Println("I'm a Branch")
+	// fmt.Println("I'm a Branch")
 	initLogging()
 	arguments := os.Args
-	if len(arguments) != 3 {
-		Error.Println("Expected Format: ./main [Local Node Name] [port]")
+	if len(arguments) != 2 {
+		Error.Println("Expected Format: ./main [port]")
 		return
 	}
 	localPort = arguments[1]
