@@ -103,15 +103,17 @@ func sendToAll(msg string) {
 	}
 }
 
-func all_say_COMMIT_OK() bool {
+func allSayCOMMIT_OK() bool {
 	i := len(branches)
+	ret := true
 	for input := range inbox {
 		if input.src == "k" {
 			continue
 		} else if input.val == "COMMIT OK" {
 			i--
 		} else if input.val == "ABORTED" {
-			return false
+			i--
+			ret = false
 		} else {
 			Error.Println("Error \t input:", input)
 			panic("Unexpected message over tcp")
@@ -121,7 +123,7 @@ func all_say_COMMIT_OK() bool {
 			break
 		}
 	}
-	return true
+	return ret
 }
 
 func handleOutgoingMessages() {

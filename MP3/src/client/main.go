@@ -44,7 +44,7 @@ func main() {
 				switch input.val {
 				case "COMMIT":
 					sendToAll("CHECK")
-					if all_say_COMMIT_OK() {
+					if allSayCOMMIT_OK() {
 						sendToAll("COMMIT")
 						fmt.Println("COMMIT OK")
 					} else {
