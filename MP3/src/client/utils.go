@@ -3,14 +3,22 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
 )
 
+var (
+	Debug   *log.Logger
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
+)
+
 func check(e error) {
 	if e != nil {
-		fmt.Println("Error Detected:")
+		Error.Println("Error Detected:")
 		panic(e)
 	}
 }
@@ -24,24 +32,26 @@ func connectToBranches() {
 	for scanner.Scan() {
 		nameAddressPort := strings.Split(scanner.Text(), ":")
 		branches[nameAddressPort[0]], err = net.Dial("tcp", nameAddressPort[1]+":"+nameAddressPort[2])
-		// TODO: make goroutine to process input into a channel
-		go pipeConnToInbox(branches[nameAddressPort[0]])
 		check(err)
+		go pipeConnToInbox(nameAddressPort[0])
 	}
-	fmt.Println("Connected to all branches in branchAddresses.txt")
+	Info.Println("Connected to all branches in branchAddresses.txt")
 }
 
 func findInputTarget(input string) string {
-	// TODO: parse target branch A, or B, or C ... from input
-	return ""
+	// parse target branch A, or B, or C ... from input
+	split := strings.SplitN(input, " ", 2)
+	target := strings.SplitN(split[1], ".", 2)
+	return target[0]
 }
 
-func pipeConnToInbox(conn net.Conn) {
+func pipeConnToInbox(branchName string) {
+	conn := branches[branchName]
 	buf := make([]byte, 1024)
 	for {
 		inputLen, err := conn.Read(buf)
 		check(err)
-		msg := Message{"t", string(buf[:inputLen])}
+		msg := Message{branchName, string(buf[:inputLen])}
 		inbox <- msg
 	}
 }
@@ -74,9 +84,9 @@ func waitForAborted() {
 }
 
 func sendToAll(msg string) {
-	// send msg to all nodes. msg can be "ABORT", "COMMIT", "ROLLBACK"
-	for _, branchConn := range branches {
-		branchConn.Write([]byte(msg))
+	// send msg to all nodes. msg can be "ABORT", "COMMIT"
+	for branchName, _ := range branches {
+		outbox <- Message{branchName, msg} //branchConn.Write([]byte(msg))
 	}
 }
 
@@ -99,4 +109,30 @@ func all_say_COMMIT_OK() bool {
 		}
 	}
 	return true
+}
+
+func handleOutgoingMessages() {
+	for m := range outbox {
+		_, err := branches[m.src].Write([]byte(m.val + "\n"))
+		check(err)
+	}
+}
+
+func initLogging() {
+	debugHandle, infoHandle, warningHandle, errorHandle := os.Stdout, os.Stdout, os.Stdout, os.Stderr
+	Debug = log.New(debugHandle,
+		"DEBUG: ",
+		log.Ltime|log.Lshortfile)
+
+	Info = log.New(infoHandle,
+		"INFO: ",
+		log.Ltime|log.Lshortfile)
+
+	Warning = log.New(warningHandle,
+		"WARNING: ",
+		log.Ltime|log.Lshortfile)
+
+	Error = log.New(errorHandle,
+		"ERROR: ",
+		log.Ltime|log.Lshortfile)
 }

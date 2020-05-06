@@ -13,7 +13,6 @@ client:
 
 launcher:
 	@echo "building launcher"
-	make branch
 	go build -o launcher launcher.go
 
 clean:

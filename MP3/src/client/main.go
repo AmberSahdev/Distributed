@@ -7,14 +7,20 @@ import (
 
 var branches map[string]net.Conn
 var inbox chan Message
+var outbox chan Message
 
 func main() {
+	// Setup
 	branches = make(map[string]net.Conn)
-	inbox = make(chan Message, 65536)
+	inbox = make(chan Message, 1024)
+	outbox = make(chan Message, 1024)
+	initLogging()
 
+	// Connections
 	connectToBranches()
 	go pipeKeyboardToInbox()
 
+	// Communicate with User and Branches/Servers
 	var input Message
 	for input = range inbox {
 		if input.val == "BEGIN" && input.src == "k" {
@@ -24,34 +30,34 @@ func main() {
 					waitForAborted()
 					break
 				} else if input.val == "COMMIT" && input.src == "k" {
-					// 2 stage commit
-					sendToAll("COMMIT")
+					sendToAll("CHECK")
 					if all_say_COMMIT_OK() {
+						sendToAll("COMMIT")
 						fmt.Println("COMMIT OK")
 					} else {
-						sendToAll("ROLLBACK")
-						fmt.Println("ABORTED")
+						sendToAll("ABORT")
+						fmt.Println("ABORTED") // waitForAborted()
 					}
-
 					break
 				} else if input.src == "k" {
 					targetBranchName := findInputTarget(input.val)
-					_, err := branches[targetBranchName].Write([]byte(input.val))
-					check(err)
+					outbox <- Message{targetBranchName, input.val}
 
 					for input = range inbox {
 						if input.val == "ABORT" && input.src == "k" {
 							sendToAll("ABORT")
-							waitForAborted()
+							fmt.Println("ABORTED") // waitForAborted()
 							break
-						} else if input.src == "t" {
+						} else if input.src == targetBranchName {
 							fmt.Println(input.val)
-							// TODO check if need to abort on some input
 							if input.val == "NOT FOUND" {
 								sendToAll("ABORT")
-								waitForAborted()
+								fmt.Println("ABORTED") // waitForAborted()
 							}
 							break
+						} else {
+							Error.Println("Error\t input:", input)
+							panic("Received message over tcp from unexpected source")
 						}
 					}
 				} else {
@@ -59,7 +65,7 @@ func main() {
 				}
 			}
 		} else {
-			fmt.Println("Discarded input:", input)
+			Info.Println("Discarded input:", input)
 		}
 	}
 }
