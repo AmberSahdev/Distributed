@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -239,7 +240,7 @@ func handleIncomingConns() {
 }
 
 func initLogging() {
-	debugHandle, infoHandle, warningHandle, errorHandle := os.Stdout, os.Stdout, os.Stdout, os.Stderr
+	debugHandle, infoHandle, warningHandle, errorHandle := ioutil.Discard, ioutil.Discard, os.Stdout, os.Stderr
 	Debug = log.New(debugHandle,
 		"DEBUG: ",
 		log.Ltime|log.Lshortfile)

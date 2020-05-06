@@ -32,14 +32,12 @@ func main() {
 				waitingForBranchResponse = false
 				waitingForBranchName = ""
 				hasBegun = true
-
 			} else if hasBegun && input.val == "ABORT" {
 				sendToAll("ABORT")
 				fmt.Println("ABORTED")
 				hasBegun = false
 				waitingForBranchResponse = false
 				waitingForBranchName = ""
-
 			} else if hasBegun && !waitingForBranchResponse {
 				switch input.val {
 				case "COMMIT":
