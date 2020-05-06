@@ -51,8 +51,12 @@ func pipeConnToInbox(branchName string) {
 	for {
 		inputLen, err := conn.Read(buf)
 		check(err)
-		msg := Message{branchName, string(buf[:inputLen])}
-		inbox <- msg
+		str := string(buf[:inputLen])
+		msgArr := strings.Split(str, "\n")
+		for _, msg := range msgArr {
+			m := Message{branchName, msg}
+			inbox <- m
+		}
 	}
 }
 
