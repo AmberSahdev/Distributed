@@ -2,6 +2,7 @@ all:
 	@echo "building all"
 	make branch
 	make client
+	make launcher
 
 branch:
 	@echo "building branch"
