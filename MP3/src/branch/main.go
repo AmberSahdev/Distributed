@@ -17,11 +17,9 @@ var (
 	Warning *log.Logger
 	Error   *log.Logger
 )
-var branchName string
 var localPort string
 var localAccounts map[string]*Account
 var localAccountsMutex sync.RWMutex
-var clientCounter int
 
 func main() {
 	fmt.Println("I'm a Branch")
@@ -31,8 +29,7 @@ func main() {
 		Error.Println("Expected Format: ./main [Local Node Name] [port]")
 		return
 	}
-	branchName = arguments[1]
-	localPort = arguments[2]
+	localPort = arguments[1]
 	localAccounts = make(map[string]*Account)
 	handleIncomingConns()
 }

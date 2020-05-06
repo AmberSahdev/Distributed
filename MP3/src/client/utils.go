@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -63,11 +62,12 @@ func pipeConnToInbox(branchName string) {
 func pipeKeyboardToInbox() {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		msg := Message{"k", string(scanner.Text())}
+		msg := Message{"k", scanner.Text()}
 		inbox <- msg
 	}
 }
 
+/*
 func waitForAborted() {
 	i := len(branches)
 	for input := range inbox {
@@ -86,10 +86,11 @@ func waitForAborted() {
 	}
 	fmt.Println("ABORTED")
 }
+*/
 
 func sendToAll(msg string) {
 	// send msg to all nodes. msg can be "ABORT", "COMMIT"
-	for branchName, _ := range branches {
+	for branchName := range branches {
 		outbox <- Message{branchName, msg} //branchConn.Write([]byte(msg))
 	}
 }

@@ -7,8 +7,6 @@ import (
 	"sync"
 )
 
-type ClientID int
-
 type clientNode struct {
 	conn   net.Conn
 	inbox  chan string // channel to receive Messages received from neighbor

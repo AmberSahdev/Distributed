@@ -18,8 +18,8 @@ func main() {
 
 	// Connections
 	connectToBranches()
+	go handleOutgoingMessages()
 	go pipeKeyboardToInbox()
-
 	// Communicate with User and Branches/Servers
 	var input Message
 	for input = range inbox {
