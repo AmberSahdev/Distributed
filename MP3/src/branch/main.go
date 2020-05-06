@@ -5,6 +5,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
 )
 
 // from https://www.ardanlabs.com/blog/2013/11/using-log-package-in-go.html
@@ -16,7 +19,8 @@ var (
 )
 var branchName string
 var localPort string
-var localAccounts map[string]Account
+var localAccounts map[string]*Account
+var localAccountsMutex sync.RWMutex
 var clientCounter int
 
 func main() {
@@ -29,6 +33,7 @@ func main() {
 	}
 	branchName = arguments[1]
 	localPort = arguments[2]
+	localAccounts = make(map[string]*Account)
 	handleIncomingConns()
 }
 
@@ -64,15 +69,129 @@ func (curNode *clientNode) sendOutgoingMessages() {
 }
 
 func handleClientComm(conn net.Conn) {
-	clientCounter += 1
-	var curClientID ClientID
-	curClientID = clientCounter
 	curNode := clientNode{conn, make(chan string, 1024), make(chan string, 1024)}
 	go curNode.receiveIncomingMessages()
 	go curNode.sendOutgoingMessages()
+	isWriteLockedAccount := make(map[string]bool) // if a lock is in the map it is at least a read lock. if true, write lock
+	balanceChanges := make(map[string]int)        // tracks net changes in account balances during transactions!
 	for incomingMsg := range curNode.inbox {
 		// TODO: Parse message, acquire locks, apply update, Rollback!
-		Info.Println("Received Message from client:", incomingMsg)
+		incomingMsgArr := strings.Split(incomingMsg, " ")
+		switch incomingMsgArr[0] {
+		case "DEPOSIT":
+			accNameArr := strings.Split(incomingMsgArr[1], ".")
+			accName := accNameArr[1]
+			change, err := strconv.Atoi(incomingMsgArr[2])
+			check(err)
+			localAccountsMutex.Lock()
+			curAccount, exist := localAccounts[accName]
+			if !exist {
+				curAccount = new(Account) // relying on zero values for initialization
+				localAccounts[accName] = curAccount
+			}
+			localAccountsMutex.Unlock()
+			if canWrite, canRead := isWriteLockedAccount[accName]; canRead {
+				if !canWrite {
+					curAccount.Lock.PromoteLock()
+				}
+			} else {
+				curAccount.Lock.Lock()
+			}
+			isWriteLockedAccount[accName] = true
+			balanceChanges[accName] += change
+			curAccount.Balance += change
+		case "WITHDRAW":
+			accNameArr := strings.Split(incomingMsgArr[1], ".")
+			accName := accNameArr[1]
+			change, err := strconv.Atoi(incomingMsgArr[2])
+			check(err)
+			localAccountsMutex.Lock()
+			curAccount, exist := localAccounts[accName]
+			if !exist {
+				localAccountsMutex.Unlock()
+				curNode.outbox <- "NOT FOUND"
+				continue
+			}
+			localAccountsMutex.Unlock()
+			if canWrite, canRead := isWriteLockedAccount[accName]; canRead {
+				if !canWrite {
+					curAccount.Lock.PromoteLock()
+				}
+			} else {
+				curAccount.Lock.Lock()
+			}
+			isWriteLockedAccount[accName] = true
+			balanceChanges[accName] -= change
+			curAccount.Balance -= change
+		case "BALANCE":
+			// TODO: Get Read Lock on account
+			// TODO: return account balance
+			accNameArr := strings.Split(incomingMsgArr[1], ".")
+			accName := accNameArr[1]
+			localAccountsMutex.Lock()
+			curAccount, exist := localAccounts[accName]
+			if !exist {
+				localAccountsMutex.Unlock()
+				curNode.outbox <- "NOT FOUND"
+				continue
+			}
+			localAccountsMutex.Unlock()
+			if _, canRead := isWriteLockedAccount[accName]; !canRead {
+				curAccount.Lock.RLock()
+				isWriteLockedAccount[accName] = false
+			}
+			curNode.outbox <- incomingMsgArr[1] + " = " + string(curAccount.Balance)
+		case "ABORT":
+			// TODO: release all acquired locks
+			// only need read lock on map itself
+			localAccountsMutex.RLock()
+			for accName, balanceChange := range balanceChanges {
+				localAccounts[accName].Balance -= balanceChange
+			}
+			localAccountsMutex.RUnlock()
+			balanceChanges = make(map[string]int)
+			localAccountsMutex.RLock()
+			for accName, canWrite := range isWriteLockedAccount {
+				if canWrite {
+					localAccounts[accName].Lock.Unlock()
+				} else {
+					localAccounts[accName].Lock.RUnlock()
+				}
+			}
+			localAccountsMutex.RUnlock()
+			isWriteLockedAccount = make(map[string]bool)
+		case "CHECK":
+			localAccountsMutex.Lock()
+			hasBadAccountBalance := false
+			for accName := range balanceChanges {
+				if localAccounts[accName].Balance < 0 {
+					hasBadAccountBalance = true
+					break
+				}
+			}
+			if hasBadAccountBalance {
+				curNode.outbox <- "ABORTED"
+			} else {
+				curNode.outbox <- "COMMIT OK"
+			}
+			localAccountsMutex.Unlock()
+			// TODO: ensure account balances are positive
+		case "COMMIT":
+			// TODO: release all acquired locks and reset maps
+			balanceChanges = make(map[string]int)
+			localAccountsMutex.RLock()
+			for accName, canWrite := range isWriteLockedAccount {
+				if canWrite {
+					localAccounts[accName].Lock.Unlock()
+				} else {
+					localAccounts[accName].Lock.RUnlock()
+				}
+			}
+			localAccountsMutex.RUnlock()
+			isWriteLockedAccount = make(map[string]bool)
+		default:
+			Error.Println("Unknown value sent by client!")
+		}
 	}
 	close(curNode.outbox)
 	return
