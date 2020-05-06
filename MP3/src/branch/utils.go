@@ -63,6 +63,7 @@ func (curLock *AccountLock) RLock() {
 		curLock.localLock.Unlock()
 		runtime.Gosched()
 	}
+	curLock.localLock.Unlock()
 }
 
 func (curLock *AccountLock) PromoteLock() {
