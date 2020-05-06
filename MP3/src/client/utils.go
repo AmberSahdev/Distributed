@@ -24,6 +24,7 @@ func connectToBranches() {
 	for scanner.Scan() {
 		nameAddressPort := strings.Split(scanner.Text(), ":")
 		branches[nameAddressPort[0]], err = net.Dial("tcp", nameAddressPort[1]+":"+nameAddressPort[2])
+		// TODO: make goroutine to process input into a channel
 		check(err)
 	}
 	fmt.Println("Connected to all branches in branchAddresses.txt")

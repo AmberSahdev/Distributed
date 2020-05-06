@@ -20,11 +20,16 @@ func main() {
 		input := scanner.Text()
 
 		if input == "BEGIN" {
+			// NOTE: ???
 			for scanner.Scan() {
 				input = scanner.Text()
 
 				if input == "ABORT" {
-					// TODO
+					// TODO: send all branches abort
+					break
+				} else if input == "COMMIT" {
+					// TODO: send all branches commit
+					break
 				} else {
 					targetBranchName := findInputTarget(input)
 					_, err := branches[targetBranchName].Write([]byte(input))
@@ -38,7 +43,9 @@ func main() {
 
 			}
 		} else {
-			//Discard Input
+			// Discard Input
+			// TODO: logging
+			//
 		}
 	}
 
@@ -48,4 +55,9 @@ func main() {
 			- if branch replies
 		3. repeat
 	*/
+}
+
+for input <- inbox {
+	"ABORT"
+	"ABORTED"
 }
