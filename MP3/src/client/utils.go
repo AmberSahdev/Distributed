@@ -108,12 +108,12 @@ func all_say_COMMIT_OK() bool {
 	for input := range inbox {
 		if input.src == "k" {
 			continue
-		}
-		if input.src == "t" && input.val == "COMMIT OK" {
+		} else if input.val == "COMMIT OK" {
 			i--
-		} else if input.src == "t" && input.val == "ABORTED" {
+		} else if input.val == "ABORTED" {
 			return false
 		} else {
+			Error.Println("Error \t input:", input)
 			panic("Unexpected message over tcp")
 		}
 

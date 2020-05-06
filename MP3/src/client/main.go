@@ -29,6 +29,8 @@ func main() {
 	for input = range inbox {
 		if input.src == "k" { // Message from keyboard
 			if !hasBegun && input.val == "BEGIN" {
+				waitingForBranchResponse = false
+				waitingForBranchName = ""
 				hasBegun = true
 
 			} else if hasBegun && input.val == "ABORT" {
@@ -50,6 +52,8 @@ func main() {
 						fmt.Println("ABORTED") // waitForAborted()
 					}
 					hasBegun = false
+					waitingForBranchResponse = false
+					waitingForBranchName = ""
 
 				default:
 					targetBranchName := findInputTarget(input.val)
@@ -79,8 +83,6 @@ func main() {
 			waitingForBranchResponse = false
 			waitingForBranchName = ""
 
-		} else {
-			Info.Println("Discarded input (2):", input)
 		}
 	}
 }
