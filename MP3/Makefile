@@ -11,6 +11,10 @@ client:
 	@echo "building client"
 	go build -o client ./src/client/main.go ./src/client/utils.go
 
+launcher:
+	@echo "building launcher"
+	make branch
+
 clean:
 	@echo "deleting binaries"
 	rm client branch
