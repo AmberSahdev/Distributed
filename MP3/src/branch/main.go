@@ -240,7 +240,7 @@ func handleIncomingConns() {
 }
 
 func initLogging() {
-	debugHandle, infoHandle, warningHandle, errorHandle := ioutil.Discard, ioutil.Discard, os.Stdout, os.Stderr
+	debugHandle, infoHandle, warningHandle, errorHandle := ioutil.Discard, ioutil.Discard, os.Stderr, os.Stderr
 	Debug = log.New(debugHandle,
 		"DEBUG: ",
 		log.Ltime|log.Lshortfile)
