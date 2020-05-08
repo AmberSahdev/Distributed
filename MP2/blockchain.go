@@ -111,7 +111,7 @@ func extractValidTransactions(parentBlock *Block) (map[AccountID]uint64, []Trans
 		if t.Src == 0 {
 			newAccountBalances[t.Dest] += t.Amount
 			newTransactionList = append(newTransactionList, *t)
-		} else if newAccountBalances[t.Src]-t.Amount >= 0 { // if only the account's balance remainds non negative
+		} else if newAccountBalances[t.Src] >= t.Amount { // if only the account's balance remainds non negative
 			newAccountBalances[t.Src] -= t.Amount
 			newAccountBalances[t.Dest] += t.Amount
 			newTransactionList = append(newTransactionList, *t)
@@ -198,6 +198,38 @@ func verifyTransactions(curBlock *Block) bool {
 	// Step 1, ensure parent exists (it should, otherwise Log Error)
 	// Step 2, get parents account state
 	// Step 3, ensure after processing transactions you arrive at current block's account balances
+	blockMutex.RLock()
+	parentBlockInfo, _ := blockMap[curBlock.ParentBlockID]
+	parentBlock := blockList[parentBlockInfo.Index]
+	blockMutex.RUnlock()
+	testBalances := make(map[AccountID]uint64)
+	// Copy from the original map to the target map
+	for key, value := range parentBlock.AccountBalances {
+		testBalances[key] = value
+	}
+	// compute change from transactions
+	for _, transaction := range curBlock.Transactions {
+		if transaction.Src != 0 {
+			if testBalances[transaction.Src] < transaction.Amount {
+				Error.Println("Transaction that Overflowed:", transaction)
+				panic("OVERFLOW?")
+				return false
+			}
+			testBalances[transaction.Src] -= transaction.Amount
+		}
+		testBalances[transaction.Dest] += transaction.Amount
+	}
+	// ensure balances match, and the balances are positive.
+	if len(curBlock.AccountBalances) != len(testBalances) {
+		panic("Map size mismatch?")
+		return false
+	}
+	for key, value := range curBlock.AccountBalances {
+		if value < 0 || testBalances[key] != value {
+			panic("Map Value mismatch?")
+			return false
+		}
+	}
 	return true
 }
 
