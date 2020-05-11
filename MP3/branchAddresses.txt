@@ -1,5 +1,5 @@
-A:localhost:2001
-B:localhost:2002
-C:localhost:2003
-D:localhost:2004
-E:localhost:2005
+A:sp20-cs425-g22-01.cs.illinois.edu:2000
+B:sp20-cs425-g22-02.cs.illinois.edu:2000
+C:sp20-cs425-g22-03.cs.illinois.edu:2000
+D:sp20-cs425-g22-04.cs.illinois.edu:2000
+E:sp20-cs425-g22-05.cs.illinois.edu:2000
